@@ -1,0 +1,33 @@
+{
+  "name": "cannbot-cc-router",
+  "version": "0.1.0",
+  "description": "Use Cannbot models from Claude Code through CCR",
+  "type": "module",
+  "bin": {
+    "cannbot-cc": "dist/src/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "test": "npm run clean && npm run build && node --test dist/test/*.test.js",
+    "check": "npm run test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "commander": "latest",
+    "https-proxy-agent": "latest",
+    "proxy-from-env": "latest",
+    "socks-proxy-agent": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "typescript": "latest"
+  }
+}
