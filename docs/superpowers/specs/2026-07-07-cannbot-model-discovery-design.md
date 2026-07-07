@@ -52,7 +52,7 @@ The shim's authenticated `GET /v1/models` returns the OpenAI-compatible model-li
   "object": "list",
   "data": [
     {
-      "id": "glm-5.2",
+      "id": "cannbot/glm-5.2",
       "object": "model",
       "owned_by": "cannbot"
     }
@@ -60,7 +60,7 @@ The shim's authenticated `GET /v1/models` returns the OpenAI-compatible model-li
 }
 ```
 
-Claude therefore submits the selected plain model ID, which CCR resolves against the models registered for the managed `cannbot` provider.
+Claude submits a namespaced ID such as `cannbot/glm-5.2`. Before forwarding an Anthropic request to CCR, the shim rewrites only that model field to CCR's explicit-route syntax, `cannbot,glm-5.2`. CCR therefore honors the selected model instead of replacing it with `Router.default`.
 
 ### CCR routing
 
@@ -95,7 +95,7 @@ The shim accepts and streams these authenticated routes to CCR:
 - `POST /v1/messages`
 - `POST /v1/messages/count_tokens`
 
-It replaces the inbound local shim authorization with CCR's local API key when configured. It preserves request bodies, relevant content headers, status codes, response headers, JSON responses, and SSE streams.
+It replaces the inbound local shim authorization with CCR's local API key when configured. It preserves every request field except for the deterministic `cannbot/<model>` to `cannbot,<model>` model rewrite required by CCR. It preserves relevant content headers, status codes, response headers, JSON responses, and SSE streams. A namespaced model absent from the discovered catalog is rejected with a sanitized 400 response.
 
 ### Cannbot-facing requests
 
@@ -125,8 +125,8 @@ Automated tests will cover:
 
 1. Model discovery normalization, ordering, de-duplication, and malformed output.
 2. CCR reconciliation with all Cannbot models and all four Cannbot route categories while preserving unrelated configuration.
-3. Authenticated `/v1/models` output and rejection of unauthenticated requests.
-4. Anthropic JSON and SSE passthrough to a fake CCR server without credential leakage.
+3. Authenticated `/v1/models` output using `cannbot/<model>` IDs and rejection of unauthenticated requests.
+4. Anthropic JSON and SSE passthrough to a fake CCR server, including the explicit CCR model rewrite, without credential leakage.
 5. Loop prevention through explicit path routing.
 6. `code` child-process settings, gateway discovery flag, argument forwarding, and Windows command resolution.
 7. Error sanitization for unavailable CCR and failed Cannbot model discovery.
@@ -137,7 +137,7 @@ Live verification will start the services, confirm `/model` receives all models 
 ## Acceptance Criteria
 
 - Claude Code's `/model` picker contains every current Cannbot model and does not depend on the old ZenMux aliases.
-- Selecting each discovered model results in the same model ID being sent through the managed Cannbot provider.
+- Selecting each discovered `cannbot/<model>` entry results in CCR receiving `cannbot,<model>` and the same underlying model ID reaching the managed Cannbot provider.
 - `default`, `think`, `background`, and `longContext` all resolve to the Cannbot provider.
 - No global Claude settings are changed.
 - Shadowsocks can remain enabled without intercepting loopback traffic.
