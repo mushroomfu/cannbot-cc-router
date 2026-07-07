@@ -86,7 +86,10 @@ export function runAttached(
 }
 
 export function runCcrCode(args: readonly string[], options: RunOptions = {}): Promise<number> {
-  return runAttached("ccr", ["code", ...args], options);
+  return runAttached("ccr", ["code", ...args], {
+    ...options,
+    env: { ...process.env, ...options.env, NODE_NO_WARNINGS: "1" }
+  });
 }
 
 export interface ShimHealth {

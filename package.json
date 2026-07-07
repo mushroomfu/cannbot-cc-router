@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "description": "Use Cannbot models from Claude Code through CCR",
   "type": "module",
+  "license": "MIT",
   "bin": {
     "cannbot-cc": "dist/src/cli.js"
   },
   "files": [
-    "dist",
+    "dist/src",
     "README.md",
     "LICENSE"
   ],
@@ -21,13 +22,12 @@
     "node": ">=20"
   },
   "dependencies": {
-    "commander": "latest",
-    "https-proxy-agent": "latest",
-    "proxy-from-env": "latest",
-    "socks-proxy-agent": "latest"
+    "commander": "^15.0.0",
+    "https-proxy-agent": "^9.1.0",
+    "socks-proxy-agent": "^10.1.0"
   },
   "devDependencies": {
-    "@types/node": "latest",
-    "typescript": "latest"
+    "@types/node": "^26.1.0",
+    "typescript": "^6.0.3"
   }
 }

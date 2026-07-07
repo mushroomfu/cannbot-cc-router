@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, isAbsolute, join, resolve, sep } from "node:path";
+import { dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export interface CommandResolution {
   command: string;
@@ -23,10 +23,20 @@ function npmEntryFromCmd(path: string): string | undefined {
   } catch {
     return undefined;
   }
-  const match = source.match(/%dp0%[\\/]([^"\r\n]+?\.(?:[cm]?js))/i);
-  if (!match) return undefined;
-  const entry = resolve(dirname(path), match[1].replace(/[\\/]/g, sep));
-  return existsSync(entry) ? entry : undefined;
+  const base = dirname(path);
+  for (const match of source.matchAll(/%dp0%[\\/]([^"\r\n]+)(?=")/gi)) {
+    const entry = resolve(base, match[1].replace(/[\\/]/g, sep));
+    const childPath = relative(base, entry);
+    const firstSegment = childPath.split(sep)[0]?.toLowerCase();
+    if (
+      childPath.startsWith("..") ||
+      isAbsolute(childPath) ||
+      firstSegment !== "node_modules" ||
+      !existsSync(entry)
+    ) continue;
+    return entry;
+  }
+  return undefined;
 }
 
 export function resolveCommandSync(
@@ -48,6 +58,9 @@ export function resolveCommandSync(
     const cmd = baseName ? `${command}.cmd` : join(directory, `${command}.cmd`);
     if (!existsSync(cmd)) continue;
     const entry = npmEntryFromCmd(cmd);
+    if (entry && extname(entry).toLowerCase() === ".exe") {
+      return { command: entry, prefixArgs: [] };
+    }
     if (entry) return { command: process.execPath, prefixArgs: [entry] };
   }
   return { command, prefixArgs: [] };
