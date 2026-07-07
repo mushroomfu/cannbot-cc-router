@@ -48,6 +48,8 @@ test("rereads credentials for every independent request", async (t) => {
   let reads = 0;
   const shim = createShim({
     localSecret: "local-secret",
+    models: ["glm-5.2"],
+    ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
     readCredentials: async () => ({ accessToken: `token-${++reads}`, virtualKey: "key" }),
@@ -64,6 +66,8 @@ test("rereads credentials for every independent request", async (t) => {
 test("does not expose internal error details to local clients", async (t) => {
   const shim = createShim({
     localSecret: "local-secret",
+    models: ["glm-5.2"],
+    ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: "http://127.0.0.1:1/v1/chat/completions",
     proxyMode: "direct",
     readCredentials: async () => { throw new Error("access-secret must stay private"); },

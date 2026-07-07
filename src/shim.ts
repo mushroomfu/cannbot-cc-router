@@ -14,6 +14,9 @@ import type { CannbotCredentials } from "./types.js";
 
 export interface ShimOptions {
   localSecret: string;
+  models: readonly string[];
+  ccrUrl: string;
+  ccrApiKey?: string;
   upstreamUrl: string;
   proxyMode: string;
   env?: NodeJS.ProcessEnv;
@@ -37,6 +40,8 @@ export interface Shim {
 }
 
 class BodyTooLargeError extends Error {}
+class InvalidRequestError extends Error {}
+class UnsupportedModelError extends Error {}
 
 const HOP_BY_HOP_HEADERS = new Set([
   "connection",
@@ -47,6 +52,11 @@ const HOP_BY_HOP_HEADERS = new Set([
   "trailer",
   "transfer-encoding",
   "upgrade"
+]);
+
+const CCR_PATHS = new Set([
+  "/v1/messages",
+  "/v1/messages/count_tokens"
 ]);
 
 function secretsEqual(actual: string | undefined, expected: string): boolean {
@@ -81,10 +91,8 @@ function collectBody(incoming: IncomingMessage, maximum: number): Promise<Buffer
   });
 }
 
-function upstreamHeaders(
-  incoming: IncomingHttpHeaders,
-  credentials: CannbotCredentials,
-  body: Buffer
+function copiedHeaders(
+  incoming: IncomingHttpHeaders
 ): Record<string, string | string[]> {
   const headers: Record<string, string | string[]> = {};
   for (const [name, value] of Object.entries(incoming)) {
@@ -94,13 +102,34 @@ function upstreamHeaders(
       HOP_BY_HOP_HEADERS.has(lower) ||
       lower === "host" ||
       lower === "authorization" ||
+      lower === "x-api-key" ||
       lower === "x-api-vkey" ||
       lower === "content-length"
     ) continue;
     headers[lower] = value;
   }
+  return headers;
+}
+
+function upstreamHeaders(
+  incoming: IncomingHttpHeaders,
+  credentials: CannbotCredentials,
+  body: Buffer
+): Record<string, string | string[]> {
+  const headers = copiedHeaders(incoming);
   headers.authorization = `Bearer ${credentials.accessToken}`;
   headers["x-api-vkey"] = credentials.virtualKey;
+  headers["content-length"] = String(body.byteLength);
+  return headers;
+}
+
+function ccrHeaders(
+  incoming: IncomingHttpHeaders,
+  apiKey: string | undefined,
+  body: Buffer
+): Record<string, string | string[]> {
+  const headers = copiedHeaders(incoming);
+  headers["x-api-key"] = apiKey ?? "test";
   headers["content-length"] = String(body.byteLength);
   return headers;
 }
@@ -128,6 +157,55 @@ function makeUpstreamRequest(
   }));
 }
 
+function makeCcrRequest(
+  options: ShimOptions,
+  path: string,
+  incomingHeaders: IncomingHttpHeaders,
+  body: Buffer
+): Promise<IncomingMessage> {
+  return new Promise((resolve, reject) => {
+    const target = new URL(path, options.ccrUrl);
+    if (
+      target.protocol !== "http:" ||
+      target.hostname !== "127.0.0.1"
+    ) {
+      reject(new Error("CCR URL must be loopback HTTP"));
+      return;
+    }
+    const outgoing = httpRequest({
+      protocol: "http:",
+      hostname: "127.0.0.1",
+      port: target.port || "80",
+      method: "POST",
+      path: `${target.pathname}${target.search}`,
+      headers: ccrHeaders(incomingHeaders, options.ccrApiKey, body)
+    }, resolve);
+    outgoing.once("error", reject);
+    outgoing.end(body);
+  });
+}
+
+function rewriteClaudeModel(body: Buffer, models: readonly string[]): Buffer {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body.toString("utf8"));
+  } catch {
+    throw new InvalidRequestError("Invalid JSON body");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new InvalidRequestError("Request body must be an object");
+  }
+  const requestBody = parsed as Record<string, unknown>;
+  if (typeof requestBody.model === "string" && requestBody.model.startsWith("cannbot/")) {
+    const model = requestBody.model.slice("cannbot/".length);
+    if (!models.includes(model)) {
+      throw new UnsupportedModelError("Unsupported Cannbot model");
+    }
+    requestBody.model = `cannbot,${model}`;
+  }
+  return Buffer.from(JSON.stringify(requestBody));
+}
+
 function drainResponse(upstream: IncomingMessage): Promise<void> {
   if (upstream.complete) return Promise.resolve();
   return new Promise((resolve, reject) => {
@@ -145,6 +223,11 @@ function copyResponse(upstream: IncomingMessage, response: ServerResponse): void
     }
   }
   upstream.pipe(response);
+}
+
+function unauthorized(response: ServerResponse): void {
+  response.writeHead(401, { "content-type": "application/json" });
+  response.end('{"error":"unauthorized"}');
 }
 
 export function createShim(options: ShimOptions): Shim {
@@ -171,6 +254,23 @@ export function createShim(options: ShimOptions): Shim {
       return;
     }
 
+    if (incoming.method === "GET" && incoming.url === "/v1/models") {
+      if (!secretsEqual(incoming.headers.authorization, options.localSecret)) {
+        unauthorized(response);
+        return;
+      }
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({
+        object: "list",
+        data: options.models.map((model) => ({
+          id: `cannbot/${model}`,
+          object: "model",
+          owned_by: "cannbot"
+        }))
+      }));
+      return;
+    }
+
     if (incoming.method === "POST" && incoming.url === "/shutdown") {
       if (!secretsEqual(incoming.headers.authorization, options.localSecret)) {
         response.writeHead(401).end();
@@ -189,23 +289,51 @@ export function createShim(options: ShimOptions): Shim {
       return;
     }
 
-    if (incoming.method !== "POST" || incoming.url !== "/v1/chat/completions") {
+    const isCannbot = incoming.method === "POST" && incoming.url === "/v1/chat/completions";
+    const isCcr = incoming.method === "POST" && incoming.url !== undefined && CCR_PATHS.has(incoming.url);
+    if (!isCannbot && !isCcr) {
       response.writeHead(404).end();
       return;
     }
     if (!secretsEqual(incoming.headers.authorization, options.localSecret)) {
-      response.writeHead(401, { "content-type": "application/json" });
-      response.end('{"error":"unauthorized"}');
+      unauthorized(response);
       return;
     }
 
     try {
-      const body = await collectBody(incoming, maximumBodyBytes);
-      let upstream = await makeUpstreamRequest(options, incoming.headers, body);
+      const collected = await collectBody(incoming, maximumBodyBytes);
+      if (isCcr) {
+        let body: Buffer;
+        try {
+          body = rewriteClaudeModel(collected, options.models);
+        } catch (error) {
+          if (error instanceof UnsupportedModelError) {
+            response.writeHead(400, { "content-type": "application/json" });
+            response.end('{"error":"unsupported_model"}');
+            return;
+          }
+          if (error instanceof InvalidRequestError) {
+            response.writeHead(400, { "content-type": "application/json" });
+            response.end('{"error":"invalid_request"}');
+            return;
+          }
+          throw error;
+        }
+        const upstream = await makeCcrRequest(
+          options,
+          incoming.url ?? "/",
+          incoming.headers,
+          body
+        );
+        copyResponse(upstream, response);
+        return;
+      }
+
+      let upstream = await makeUpstreamRequest(options, incoming.headers, collected);
       if (upstream.statusCode === 401 || upstream.statusCode === 403) {
         await drainResponse(upstream);
         await refreshOnce();
-        upstream = await makeUpstreamRequest(options, incoming.headers, body);
+        upstream = await makeUpstreamRequest(options, incoming.headers, collected);
       }
       copyResponse(upstream, response);
     } catch (error) {
@@ -217,7 +345,7 @@ export function createShim(options: ShimOptions): Shim {
       if (!response.headersSent) {
         response.writeHead(502, { "content-type": "application/json" });
       }
-      response.end(JSON.stringify({ error: "upstream_failure" }));
+      response.end('{"error":"upstream_failure"}');
     }
   });
 

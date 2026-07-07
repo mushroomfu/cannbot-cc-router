@@ -54,6 +54,8 @@ test("refreshes once and retries with newly read credentials", async (t) => {
   let refreshes = 0;
   const shim = createShim({
     localSecret: "local-secret",
+    models: ["glm-5.2"],
+    ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
     readCredentials: async () => ({ accessToken: token, virtualKey: "virtual" }),
@@ -84,6 +86,8 @@ test("shares one refresh across concurrent authentication failures", async (t) =
 
   const shim = createShim({
     localSecret: "local-secret",
+    models: ["glm-5.2"],
+    ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
     readCredentials: async () => ({ accessToken: token, virtualKey: "virtual" }),
@@ -114,6 +118,8 @@ test("does not retry a second authentication failure", async (t) => {
 
   const shim = createShim({
     localSecret: "local-secret",
+    models: ["glm-5.2"],
+    ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
     readCredentials: async () => ({ accessToken: "token", virtualKey: "virtual" }),
@@ -139,6 +145,8 @@ test("streams SSE chunks before the upstream response ends", async (t) => {
 
   const shim = createShim({
     localSecret: "local-secret",
+    models: ["glm-5.2"],
+    ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
     readCredentials: async () => ({ accessToken: "token", virtualKey: "virtual" }),

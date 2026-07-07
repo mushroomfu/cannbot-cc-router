@@ -53,6 +53,8 @@ function call(port: number, options: {
 test("reports health and requires both secret and instance marker to stop", async () => {
   const shim = createShim({
     localSecret: "local-secret",
+    models: ["glm-5.2"],
+    ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: "http://127.0.0.1:1/v1/chat/completions",
     proxyMode: "direct",
     readCredentials: async () => ({ accessToken: "token", virtualKey: "key" }),
@@ -100,6 +102,8 @@ test("rejects a request body larger than the configured limit", async (t) => {
   t.after(() => close(upstream));
   const shim = createShim({
     localSecret: "local-secret",
+    models: ["glm-5.2"],
+    ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
     maxBodyBytes: 5,
