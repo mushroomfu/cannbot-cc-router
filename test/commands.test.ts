@@ -6,6 +6,7 @@ import type { ProjectConfig } from "../src/types.js";
 
 const config: ProjectConfig = {
   model: "glm-5.2",
+  models: ["glm-5.2"],
   shimHost: "127.0.0.1",
   shimPort: 8787,
   localSecret: "local-secret",

@@ -72,7 +72,7 @@ test("initializes secure project and managed CCR configuration", async () => {
     "existing", "cannbot"
   ]);
   assert.equal((storedCcr.Router as Record<string, string>).default, "cannbot,glm-5.2");
-  assert.equal((storedCcr.Router as Record<string, string>).think, "existing,old");
+  assert.equal((storedCcr.Router as Record<string, string>).think, "cannbot,glm-5.2");
 });
 
 test("rejects an unavailable model before writing configuration", async () => {

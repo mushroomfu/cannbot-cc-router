@@ -23,6 +23,7 @@ test("adds the managed Cannbot provider and preserves unrelated configuration", 
     shimPort: 8787,
     localSecret: "local-only",
     model: "glm-5.2",
+  models: ["glm-5.2"],
     setDefault: true
   });
 
@@ -35,7 +36,7 @@ test("adds the managed Cannbot provider and preserves unrelated configuration", 
     transformer: { use: ["openai"] }
   });
   assert.equal(merged.Router.default, "cannbot,glm-5.2");
-  assert.equal(merged.Router.think, existing.Router.think);
+  assert.equal(merged.Router.think, "cannbot,glm-5.2");
   assert.equal(merged.LOG, false);
   assert.equal(existing.Providers.length, 3, "input must not be mutated");
 });
@@ -52,6 +53,7 @@ test("reconciliation is idempotent and replaces only the named provider", () => 
     shimPort: 9000,
     localSecret: "new-local-secret",
     model: "glm-5.2",
+  models: ["glm-5.2"],
     setDefault: false
   };
   const once = reconcileCcrConfig(withOldCannbot, options);
@@ -67,12 +69,14 @@ test("rejects malformed CCR configuration shapes", () => {
     shimPort: 8787,
     localSecret: "secret",
     model: "glm-5.2",
+  models: ["glm-5.2"],
     setDefault: true
   }), /object/);
   assert.throws(() => reconcileCcrConfig({ Providers: {}, Router: {} }, {
     shimPort: 8787,
     localSecret: "secret",
     model: "glm-5.2",
+  models: ["glm-5.2"],
     setDefault: true
   }), /Providers/);
 });

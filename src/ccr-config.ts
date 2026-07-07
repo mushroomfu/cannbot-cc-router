@@ -13,11 +13,25 @@ export interface ReconcileOptions {
   shimPort: number;
   localSecret: string;
   model: string;
+  models: readonly string[];
   setDefault: boolean;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function validateModels(models: readonly string[], selected: string): void {
+  if (
+    models.length === 0 ||
+    models.some((model) => typeof model !== "string" || model.trim().length === 0) ||
+    new Set(models).size !== models.length
+  ) {
+    throw new TypeError("Cannbot models must be unique non-empty strings");
+  }
+  if (!models.includes(selected)) {
+    throw new TypeError("Cannbot models must contain the selected model");
+  }
 }
 
 export function reconcileCcrConfig(
@@ -33,6 +47,7 @@ export function reconcileCcrConfig(
   if (!isRecord(input.Router)) {
     throw new TypeError("CCR configuration Router must be an object");
   }
+  validateModels(options.models, options.model);
 
   const providers = input.Providers.map((provider) => {
     if (!isRecord(provider) || typeof provider.name !== "string") {
@@ -45,13 +60,16 @@ export function reconcileCcrConfig(
     name: "cannbot",
     api_base_url: `http://127.0.0.1:${options.shimPort}/v1/chat/completions`,
     api_key: options.localSecret,
-    models: [options.model],
+    models: [...options.models],
     transformer: { use: ["openai"] }
   });
 
   const router = structuredClone(input.Router);
   if (options.setDefault) {
-    router.default = `cannbot,${options.model}`;
+    const route = `cannbot,${options.model}`;
+    for (const key of ["default", "think", "background", "longContext"] as const) {
+      router[key] = route;
+    }
   }
 
   return {

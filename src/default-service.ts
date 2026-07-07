@@ -14,7 +14,15 @@ import { readCredentials } from "./credentials.js";
 import { runDoctor, type DoctorDependencies, type DoctorReport } from "./doctor.js";
 import { backupOnce, readJsonFile, writeJsonAtomic } from "./file-store.js";
 import { resolvePaths } from "./paths.js";
-import { ensureShim, readShimHealth, runCaptured, runCcrCode, stopShim } from "./processes.js";
+import {
+  ensureShim,
+  readShimHealth,
+  runCaptured,
+  runCcrCode,
+  stopShim,
+  type RunOptions,
+  type RunResult
+} from "./processes.js";
 import { selectProxy } from "./proxy.js";
 import { RouterService, type InitOptions } from "./router-service.js";
 import type { ProjectConfig, ResolvedPaths } from "./types.js";
@@ -22,20 +30,37 @@ import type { ProjectConfig, ResolvedPaths } from "./types.js";
 const CANNBOT_UPSTREAM =
   "https://cannbot.hicann.cn/gateway/compatible-mode/v1/chat/completions";
 
+export type CapturedRunner = (
+  command: string,
+  args: readonly string[],
+  options: RunOptions
+) => Promise<RunResult>;
+
 export function parseCannbotModels(output: string): string[] {
-  return output
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line.startsWith("cannbot/"))
-    .map((line) => line.slice("cannbot/".length));
+  const seen = new Set<string>();
+  const models: string[] = [];
+  for (const rawLine of output.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line.startsWith("cannbot/")) continue;
+    const model = line.slice("cannbot/".length);
+    if (!model || seen.has(model)) continue;
+    seen.add(model);
+    models.push(model);
+  }
+  return models;
 }
 
-export async function listCannbotModels(): Promise<string[]> {
-  const result = await runCaptured("cannbot", ["models", "cannbot"], {
+export async function listCannbotModels(
+  runner: CapturedRunner = runCaptured
+): Promise<string[]> {
+  const result = await runner("cannbot", ["models", "cannbot"], {
     timeoutMs: 30_000
   });
-  if (result.code !== 0) throw new Error("Unable to query Cannbot models");
-  return parseCannbotModels(result.stdout);
+  const models = parseCannbotModels(result.stdout);
+  if (result.code !== 0 || models.length === 0) {
+    throw new Error("Unable to query Cannbot models");
+  }
+  return models;
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -57,7 +82,15 @@ function validateProjectConfig(value: unknown): ProjectConfig {
     typeof config.localSecret !== "string" ||
     typeof config.proxy !== "string"
   ) throw new Error("Project config is incomplete; run `cannbot-cc init`");
-  return { ...config, shimHost: "127.0.0.1" } as ProjectConfig;
+  const models = config.models ?? [config.model];
+  if (
+    !Array.isArray(models) ||
+    models.length === 0 ||
+    models.some((model) => typeof model !== "string" || model.trim().length === 0)
+  ) {
+    throw new Error("Project config model catalog is invalid; run `cannbot-cc sync`");
+  }
+  return { ...config, models: [...models], shimHost: "127.0.0.1" } as ProjectConfig;
 }
 
 export async function loadProjectConfig(paths: ResolvedPaths): Promise<ProjectConfig> {
@@ -95,6 +128,7 @@ export async function initializeProject(
   const ccrBackup = previous?.ccrBackup ?? (ccrExists ? await backupOnce(paths.ccrConfig) : undefined);
   const config: ProjectConfig = {
     model: options.model,
+    models: [...models],
     shimHost: "127.0.0.1",
     shimPort: options.shimPort,
     localSecret: previous?.localSecret ?? (dependencies.secret ?? (() => randomBytes(32).toString("base64url")))(),
@@ -105,6 +139,7 @@ export async function initializeProject(
     shimPort: config.shimPort,
     localSecret: config.localSecret,
     model: config.model,
+    models: config.models,
     setDefault: options.setDefault
   });
   await writeJsonAtomic(paths.projectConfig, config);
@@ -117,20 +152,27 @@ async function reconcileProject(
   paths: ResolvedPaths,
   setDefault: boolean
 ): Promise<void> {
+  const models = await listCannbotModels();
+  if (!models.includes(config.model)) {
+    throw new Error(`Cannbot model is not available: ${config.model}`);
+  }
   const ccrExists = await exists(paths.ccrConfig);
   const ccr = ccrExists
     ? await readJsonFile(paths.ccrConfig)
     : { Providers: [], Router: {} };
-  if (!config.ccrBackup && ccrExists) {
-    config.ccrBackup = await backupOnce(paths.ccrConfig);
-    await writeJsonAtomic(paths.projectConfig, config);
+  const nextConfig: ProjectConfig = { ...config, models: [...models] };
+  if (!nextConfig.ccrBackup && ccrExists) {
+    nextConfig.ccrBackup = await backupOnce(paths.ccrConfig);
   }
-  await writeJsonAtomic(paths.ccrConfig, reconcileCcrConfig(ccr, {
-    shimPort: config.shimPort,
-    localSecret: config.localSecret,
-    model: config.model,
+  const merged = reconcileCcrConfig(ccr, {
+    shimPort: nextConfig.shimPort,
+    localSecret: nextConfig.localSecret,
+    model: nextConfig.model,
+    models: nextConfig.models,
     setDefault
-  }));
+  });
+  await writeJsonAtomic(paths.projectConfig, nextConfig);
+  await writeJsonAtomic(paths.ccrConfig, merged);
 }
 
 export function createDefaultRouterService(
@@ -194,6 +236,7 @@ export function createDefaultDoctorDependencies(
         shimPort: project.shimPort,
         localSecret: project.localSecret,
         model: project.model,
+        models: project.models,
         setDefault: false
       });
     },
