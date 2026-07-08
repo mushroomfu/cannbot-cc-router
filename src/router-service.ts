@@ -28,7 +28,7 @@ export interface RouterServiceDependencies {
   restartCcr(): Promise<boolean>;
   shimStatus(config: ProjectConfig): Promise<boolean>;
   ccrStatus(): Promise<boolean>;
-  runCcrCode(args: readonly string[]): Promise<number>;
+  runClaudeCode(args: readonly string[], config: ProjectConfig): Promise<number>;
 }
 
 export class RouterService {
@@ -76,6 +76,7 @@ export class RouterService {
 
   async code(args: readonly string[]): Promise<number> {
     await this.start();
-    return this.dependencies.runCcrCode(args);
+    const config = await this.dependencies.loadConfig();
+    return this.dependencies.runClaudeCode(args, config);
   }
 }

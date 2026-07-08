@@ -18,7 +18,7 @@ import {
   ensureShim,
   readShimHealth,
   runCaptured,
-  runCcrCode,
+  runClaudeCode,
   stopShim,
   type RunOptions,
   type RunResult
@@ -190,7 +190,7 @@ export function createDefaultRouterService(
     restartCcr,
     shimStatus: async (config) => Boolean(await readShimHealth(config.shimPort)),
     ccrStatus,
-    runCcrCode
+    runClaudeCode
   });
 }
 

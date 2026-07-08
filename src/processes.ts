@@ -8,6 +8,8 @@ import { readJsonFile } from "./file-store.js";
 import { childProxyEnv } from "./proxy.js";
 import type { ProjectConfig, ResolvedPaths } from "./types.js";
 
+export { runClaudeCode } from "./claude-launcher.js";
+
 export type SpawnFunction = (
   command: string,
   args: readonly string[],

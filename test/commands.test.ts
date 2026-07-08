@@ -27,7 +27,7 @@ function serviceWithTrace(): { service: RouterService; trace: string[] } {
     restartCcr: async () => { trace.push("restart-ccr"); return true; },
     shimStatus: async () => { trace.push("shim-status"); return true; },
     ccrStatus: async () => { trace.push("ccr-status"); return true; },
-    runCcrCode: async (args) => { trace.push(`ccr-code:${args.join("|")}`); return 4; }
+    runClaudeCode: async (args) => { trace.push(`claude-code:${args.join("|")}`); return 4; }
   };
   return { service: new RouterService(dependencies), trace };
 }
@@ -54,7 +54,8 @@ test("code starts services and passes Claude arguments unchanged", async () => {
     "reconcile:false",
     "ensure-shim",
     "start-ccr",
-    "ccr-code:-p|hello world|--allowedTools|Read"
+    "load-config",
+    "claude-code:-p|hello world|--allowedTools|Read"
   ]);
 });
 
