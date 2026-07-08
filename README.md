@@ -36,6 +36,8 @@ cannbot connect
 
 ## Install
 
+### One-time install
+
 From this repository:
 
 ```powershell
@@ -44,7 +46,28 @@ npm run build
 npm install -g .
 ```
 
-The same commands work in bash and zsh.
+The same commands work in bash and zsh. `npm install` installs the TypeScript toolchain, `npm run build` compiles to `dist/`, and `npm install -g .` registers the global `cannbot-cc` command.
+
+### Daily start
+
+Once installed, run `cannbot-cc code` from any directory to start the shim and CCR and launch Claude Code:
+
+```powershell
+cannbot-cc code
+```
+
+The command reads its configuration from `~/.cannbot-cc-router/`, so it is independent of the current working directory. No reconfiguration is needed between sessions; run `cannbot-cc code` whenever you want to start coding. On first use, run `cannbot-cc init --model glm-5.2 --set-default` once beforehand (see [Quick start](#quick-start)).
+
+### Reinstall after updating the code
+
+After pulling new changes from this repository, rebuild and reinstall so the global command picks up the new code:
+
+```powershell
+npm run build
+npm install -g .
+```
+
+If `package.json` dependencies changed since the last install, run `npm install` first to update them.
 
 ## Quick start
 
