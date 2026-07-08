@@ -100,15 +100,15 @@ test("rewrites a discovered model and proxies Anthropic JSON to CCR", async (t) 
   const address = await shim.listen();
   t.after(() => shim.close());
 
-  const result = await post(address.port, "/v1/messages/count_tokens", JSON.stringify({
-    model: "cannbot/glm-5.2",
+  const result = await post(address.port, "/v1/messages/count_tokens?beta=true", JSON.stringify({
+    model: "anthropic/cannbot/glm-5.2",
     messages: [{ role: "user", content: "hello" }]
   }));
 
   assert.equal(result.status, 200);
   assert.equal(result.body, '{"input_tokens":17}');
   assert.equal(captured.length, 1);
-  assert.equal(captured[0].url, "/v1/messages/count_tokens");
+  assert.equal(captured[0].url, "/v1/messages/count_tokens?beta=true");
   assert.equal(captured[0].headers["x-api-key"], "ccr-local-key");
   assert.notEqual(captured[0].headers.authorization, "Bearer local-secret");
   assert.doesNotMatch(JSON.stringify(captured[0]), /cannbot-access-secret|cannbot-virtual-secret/);
@@ -130,8 +130,8 @@ test("streams CCR SSE responses through the Anthropic messages path", async (t) 
   const address = await shim.listen();
   t.after(() => shim.close());
 
-  const result = await post(address.port, "/v1/messages", JSON.stringify({
-    model: "cannbot/deepseek-v4-pro",
+  const result = await post(address.port, "/v1/messages?beta=true", JSON.stringify({
+    model: "anthropic/cannbot/deepseek-v4-pro",
     messages: []
   }));
   assert.equal(result.status, 200);
@@ -152,8 +152,8 @@ test("rejects an unknown namespaced model before contacting CCR", async (t) => {
   const address = await shim.listen();
   t.after(() => shim.close());
 
-  const result = await post(address.port, "/v1/messages", JSON.stringify({
-    model: "cannbot/not-available",
+  const result = await post(address.port, "/v1/messages?beta=true", JSON.stringify({
+    model: "anthropic/cannbot/not-available",
     messages: []
   }));
   assert.equal(result.status, 400);
@@ -165,8 +165,8 @@ test("sanitizes a failed CCR connection", async (t) => {
   const shim = shimFor(1);
   const address = await shim.listen();
   t.after(() => shim.close());
-  const result = await post(address.port, "/v1/messages", JSON.stringify({
-    model: "cannbot/glm-5.2",
+  const result = await post(address.port, "/v1/messages?beta=true", JSON.stringify({
+    model: "anthropic/cannbot/glm-5.2",
     messages: []
   }));
   assert.equal(result.status, 502);

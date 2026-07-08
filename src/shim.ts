@@ -196,8 +196,8 @@ function rewriteClaudeModel(body: Buffer, models: readonly string[]): Buffer {
     throw new InvalidRequestError("Request body must be an object");
   }
   const requestBody = parsed as Record<string, unknown>;
-  if (typeof requestBody.model === "string" && requestBody.model.startsWith("cannbot/")) {
-    const model = requestBody.model.slice("cannbot/".length);
+  if (typeof requestBody.model === "string" && requestBody.model.startsWith("anthropic/cannbot/")) {
+    const model = requestBody.model.slice("anthropic/cannbot/".length);
     if (!models.includes(model)) {
       throw new UnsupportedModelError("Unsupported Cannbot model");
     }
@@ -248,13 +248,14 @@ export function createShim(options: ShimOptions): Shim {
   };
 
   const server: Server = createServer(async (incoming, response) => {
-    if (incoming.method === "GET" && incoming.url === "/health") {
+    const pathname = new URL(incoming.url ?? "/", "http://127.0.0.1").pathname;
+    if (incoming.method === "GET" && pathname === "/health") {
       response.writeHead(200, { "content-type": "application/json" });
       response.end(JSON.stringify({ status: "ok", instanceId, pid: process.pid }));
       return;
     }
 
-    if (incoming.method === "GET" && incoming.url === "/v1/models") {
+    if (incoming.method === "GET" && pathname === "/v1/models") {
       if (!secretsEqual(incoming.headers.authorization, options.localSecret)) {
         unauthorized(response);
         return;
@@ -263,7 +264,8 @@ export function createShim(options: ShimOptions): Shim {
       response.end(JSON.stringify({
         object: "list",
         data: options.models.map((model) => ({
-          id: `cannbot/${model}`,
+          id: `anthropic/cannbot/${model}`,
+          display_name: `Cannbot · ${model}`,
           object: "model",
           owned_by: "cannbot"
         }))
@@ -271,7 +273,7 @@ export function createShim(options: ShimOptions): Shim {
       return;
     }
 
-    if (incoming.method === "POST" && incoming.url === "/shutdown") {
+    if (incoming.method === "POST" && pathname === "/shutdown") {
       if (!secretsEqual(incoming.headers.authorization, options.localSecret)) {
         response.writeHead(401).end();
         return;
@@ -289,8 +291,8 @@ export function createShim(options: ShimOptions): Shim {
       return;
     }
 
-    const isCannbot = incoming.method === "POST" && incoming.url === "/v1/chat/completions";
-    const isCcr = incoming.method === "POST" && incoming.url !== undefined && CCR_PATHS.has(incoming.url);
+    const isCannbot = incoming.method === "POST" && pathname === "/v1/chat/completions";
+    const isCcr = incoming.method === "POST" && CCR_PATHS.has(pathname);
     if (!isCannbot && !isCcr) {
       response.writeHead(404).end();
       return;

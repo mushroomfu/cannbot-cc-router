@@ -58,9 +58,9 @@ Extend `test/default-service.test.ts` with assertions equivalent to:
 ```ts
 test("normalizes and de-duplicates Cannbot models in reported order", () => {
   assert.deepEqual(parseCannbotModels([
-    "cannbot/glm-5.2",
-    "cannbot/deepseek-v4-pro",
-    "cannbot/glm-5.2",
+    "anthropic/cannbot/glm-5.2",
+    "anthropic/cannbot/deepseek-v4-pro",
+    "anthropic/cannbot/glm-5.2",
     "noise"
   ].join("\n")), ["glm-5.2", "deepseek-v4-pro"]);
 });
@@ -173,21 +173,21 @@ git commit -m "feat: synchronize Cannbot model catalog"
 
 **Interfaces:**
 - Consumes: `ShimOptions.models: readonly string[]`, `ShimOptions.ccrUrl: string`, and optional `ShimOptions.ccrApiKey?: string`.
-- Produces: authenticated `GET /v1/models`.
+- Produces: authenticated `GET /v1/models?limit=1000`.
 - Produces: authenticated passthrough for `POST /v1/messages` and `POST /v1/messages/count_tokens`.
 - Produces: `loadShimOptions(configPath: string): Promise<ShimOptions>` for startup wiring and isolated tests.
 - Preserves: existing `POST /v1/chat/completions`, health, shutdown, retry, proxy, and size-limit behavior.
 
 - [ ] **Step 1: Write a failing authenticated model-discovery test**
 
-Create `test/shim-model-discovery.test.ts` using a real loopback shim and native HTTP request. Assert that `GET /v1/models` with `Authorization: Bearer local-secret` returns status 200 and:
+Create `test/shim-model-discovery.test.ts` using a real loopback shim and native HTTP request. Assert that `GET /v1/models?limit=1000` with `Authorization: Bearer local-secret` returns status 200 and:
 
 ```ts
 {
   object: "list",
   data: [
-    { id: "cannbot/deepseek-v4-pro", object: "model", owned_by: "cannbot" },
-    { id: "cannbot/glm-5.2", object: "model", owned_by: "cannbot" }
+    { id: "anthropic/cannbot/deepseek-v4-pro", display_name: "Cannbot · deepseek-v4-pro", object: "model", owned_by: "cannbot" },
+    { id: "anthropic/cannbot/glm-5.2", display_name: "Cannbot · glm-5.2", object: "model", owned_by: "cannbot" }
   ]
 }
 ```
@@ -203,7 +203,7 @@ npm run build
 node --test dist/test/shim-model-discovery.test.js
 ```
 
-Expected: FAIL because `ShimOptions.models` and `GET /v1/models` are not implemented.
+Expected: FAIL because `ShimOptions.models` and `GET /v1/models?limit=1000` are not implemented.
 
 - [ ] **Step 3: Implement only `/v1/models` and verify GREEN**
 
@@ -226,7 +226,7 @@ if (incoming.method === "GET" && incoming.url === "/v1/models") {
   response.writeHead(200, { "content-type": "application/json" });
   response.end(JSON.stringify({
     object: "list",
-    data: options.models.map((id) => ({ id: `cannbot/${id}`, object: "model", owned_by: "cannbot" }))
+    data: options.models.map((id) => ({ id: `anthropic/cannbot/${id}`, display_name: `Cannbot · ${id}`, object: "model", owned_by: "cannbot" }))
   }));
   return;
 }
@@ -246,7 +246,7 @@ const cases = ["/v1/messages", "/v1/messages/count_tokens"];
 
 For each path, send the local bearer token to the shim and assert the fake CCR receives:
 
-- the exact path and every original POST field, with only `model: "cannbot/glm-5.2"` rewritten to `model: "cannbot,glm-5.2"`;
+- the exact path and every original POST field, with only `model: "anthropic/cannbot/glm-5.2"` rewritten to `model: "cannbot,glm-5.2"`;
 - `x-api-key: ccr-local-key`;
 - neither the shim bearer token nor any Cannbot access token;
 - the original content type.
@@ -476,7 +476,7 @@ node dist\src\cli.js status --json
 
 Expected status: `{"shim":true,"ccr":true}`.
 
-Read the project config and send authenticated `GET http://127.0.0.1:8787/v1/models` without printing the token. Compare returned IDs to `cannbot models cannbot`; both use the `cannbot/<model>` namespace, so sets and order must match.
+Read the project config and send authenticated `GET http://127.0.0.1:8787/v1/models` without printing the token. Compare returned IDs to `cannbot models cannbot`; strip the `cannbot/` and `anthropic/cannbot/` prefixes respectively; the underlying model sets and order must match.
 
 Inspect sanitized CCR configuration and assert:
 

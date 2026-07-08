@@ -9,7 +9,7 @@ function get(port: number, authorization?: string): Promise<{ status: number; bo
     const outgoing = request({
       host: "127.0.0.1",
       port,
-      path: "/v1/models",
+      path: "/v1/models?limit=1000",
       method: "GET",
       headers: authorization ? { authorization } : {}
     }, (response) => {
@@ -44,8 +44,8 @@ test("serves the authenticated Cannbot model catalog with namespaced IDs", async
   assert.deepEqual(JSON.parse(result.body), {
     object: "list",
     data: [
-      { id: "cannbot/deepseek-v4-pro", object: "model", owned_by: "cannbot" },
-      { id: "cannbot/glm-5.2", object: "model", owned_by: "cannbot" }
+      { id: "anthropic/cannbot/deepseek-v4-pro", display_name: "Cannbot · deepseek-v4-pro", object: "model", owned_by: "cannbot" },
+      { id: "anthropic/cannbot/glm-5.2", display_name: "Cannbot · glm-5.2", object: "model", owned_by: "cannbot" }
     ]
   });
 });
