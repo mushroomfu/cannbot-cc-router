@@ -101,5 +101,3 @@ test("CCR reconciliation rejects a catalog missing the selected model", () => {
     setDefault: true
   } as Parameters<typeof reconcileCcrConfig>[1]), /selected model/i);
 });
-
-
