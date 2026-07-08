@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import { pathToFileURL } from "node:url";
+import { realpathSync } from "node:fs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { Command, Option } from "commander";
 
@@ -157,7 +158,20 @@ export function buildProgram(
   return program;
 }
 
+// Run only when invoked directly as the entry point, not when imported by tests.
+// Compare real paths so the check still holds when this module is reached through
+// a symlink (e.g. `npm install -g .` links node_modules/cannbot-cc-router to the
+// source tree, and Node resolves import.meta.url to the real path while
+// process.argv[1] stays as the symlink path).
 const invokedPath = process.argv[1];
-if (invokedPath && import.meta.url === pathToFileURL(invokedPath).href) {
+function isMainEntry(invoked: string | undefined): boolean {
+  if (!invoked) return false;
+  try {
+    return realpathSync(invoked) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return import.meta.url === pathToFileURL(invoked).href;
+  }
+}
+if (isMainEntry(invokedPath)) {
   await buildProgram().parseAsync(process.argv);
 }
