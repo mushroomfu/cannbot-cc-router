@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
+import { realpathSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { readCredentials } from "./credentials.js";
 import { readJsonFile, writeJsonAtomic } from "./file-store.js";
@@ -118,8 +119,19 @@ export async function runShimMain(configArgument: string): Promise<void> {
   process.once("SIGTERM", () => { void stop(); });
 }
 
+// Run only when invoked directly as the entry point, not when imported by tests.
+// Compare real paths so the check still holds when this module is reached through
+// a symlink (see cli.ts for the same guard).
 const invokedPath = process.argv[1];
-if (invokedPath && import.meta.url === pathToFileURL(invokedPath).href) {
+function isMainEntry(invoked: string | undefined): boolean {
+  if (!invoked) return false;
+  try {
+    return realpathSync(invoked) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return import.meta.url === pathToFileURL(invoked).href;
+  }
+}
+if (isMainEntry(invokedPath)) {
   try {
     await runShimMain(parseShimMainArgs(process.argv));
   } catch (error) {
