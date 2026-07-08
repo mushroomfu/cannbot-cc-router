@@ -65,6 +65,7 @@ export async function runClaudeCode(
       ANTHROPIC_BASE_URL: `http://127.0.0.1:${config.shimPort}`,
       ANTHROPIC_AUTH_TOKEN: config.localSecret,
       CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY: "1",
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "",
       NO_PROXY: noProxy,
       DISABLE_TELEMETRY: "true",
       DISABLE_COST_WARNINGS: "true",

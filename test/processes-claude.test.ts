@@ -60,6 +60,7 @@ test("launches Claude with temporary gateway discovery settings", async () => {
   assert.equal(settings?.env.ANTHROPIC_BASE_URL, "http://127.0.0.1:8787");
   assert.equal(settings?.env.ANTHROPIC_AUTH_TOKEN, "local-secret");
   assert.equal(settings?.env.CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY, "1");
+  assert.equal(settings?.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC, "");
   assert.match(settings?.env.NO_PROXY ?? "", /internal\.example/);
   assert.match(settings?.env.NO_PROXY ?? "", /localhost/);
   assert.match(settings?.env.NO_PROXY ?? "", /127\.0\.0\.1/);
