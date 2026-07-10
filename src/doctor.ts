@@ -15,6 +15,7 @@ export interface DoctorReport {
 export interface DoctorDependencies {
   nodeVersion(): string;
   executable(name: "cannbot" | "ccr" | "claude"): Promise<boolean>;
+  ccrVersion(): Promise<2 | 3>;
   credentials(): Promise<void>;
   ccrConfig(): Promise<void>;
   proxy(): Promise<string>;
@@ -53,6 +54,18 @@ export async function runDoctor(dependencies: DoctorDependencies): Promise<Docto
       status: available ? "pass" : "fail",
       detail: available ? `${name} is available` : `${name} is missing`,
       ...(available ? {} : { action: `Install ${name}` })
+    });
+  }
+
+  try {
+    const version = await dependencies.ccrVersion();
+    checks.push({ name: "ccr-version", status: "pass", detail: `CCR v${version} is supported` });
+  } catch {
+    checks.push({
+      name: "ccr-version",
+      status: "fail",
+      detail: "CCR version is unsupported or unavailable",
+      action: "Install a supported CCR v2 or v3 release"
     });
   }
 

@@ -3,6 +3,7 @@ import { access } from "node:fs/promises";
 import { connect } from "node:net";
 
 import { reconcileCcrConfig } from "./ccr-config.js";
+import { detectCcrVersion } from "./ccr-version.js";
 import {
   ccrStatus,
   checkExecutable,
@@ -221,6 +222,7 @@ export function createDefaultDoctorDependencies(
       name,
       name === "ccr" ? ["version"] : ["--version"]
     ),
+    ccrVersion: () => detectCcrVersion(),
     credentials: async () => { await readCredentials(paths); },
     ccrConfig: async () => {
       const [ccr, project, credentials] = await Promise.all([

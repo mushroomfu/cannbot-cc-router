@@ -7,6 +7,7 @@ function healthyDependencies(overrides: Partial<DoctorDependencies> = {}): Docto
   return {
     nodeVersion: () => "24.14.0",
     executable: async () => true,
+    ccrVersion: async () => 2,
     credentials: async () => undefined,
     ccrConfig: async () => undefined,
     proxy: async () => "http://127.0.0.1:10808",
@@ -24,6 +25,7 @@ test("doctor reports every required boundary without secrets", async () => {
     "cannbot",
     "ccr",
     "claude",
+    "ccr-version",
     "credentials",
     "ccr-config",
     "proxy",
@@ -54,4 +56,12 @@ test("missing runtime and unreachable upstream fail doctor", async () => {
     report.checks.filter((check) => check.status === "fail").map((check) => check.name),
     ["ccr", "cannbot-upstream"]
   );
+});
+
+test("unsupported CCR versions fail doctor", async () => {
+  const report = await runDoctor(healthyDependencies({
+    ccrVersion: async () => { throw new Error("unsupported"); }
+  }));
+  assert.equal(report.ok, false);
+  assert.equal(report.checks.find((check) => check.name === "ccr-version")?.status, "fail");
 });
