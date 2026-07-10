@@ -3,6 +3,9 @@ import { access } from "node:fs/promises";
 import { connect } from "node:net";
 
 import { reconcileCcrConfig } from "./ccr-config.js";
+import type { CcrAdapter } from "./ccr-adapter.js";
+import { CcrV2Adapter } from "./ccr-v2-adapter.js";
+import { CcrV3Adapter } from "./ccr-v3-adapter.js";
 import { detectCcrVersion } from "./ccr-version.js";
 import {
   ccrStatus,
@@ -102,6 +105,7 @@ export interface InitializeProjectDependencies {
   paths: ResolvedPaths;
   listModels?: () => Promise<string[]>;
   secret?: () => string;
+  ccr?: CcrAdapter;
 }
 
 export async function initializeProject(
@@ -109,6 +113,7 @@ export async function initializeProject(
   dependencies: InitializeProjectDependencies
 ): Promise<ProjectConfig> {
   const { paths } = dependencies;
+  const ccrAdapter = dependencies.ccr ?? await resolveCcrAdapter(paths);
   if (!Number.isInteger(options.shimPort) || options.shimPort < 1 || options.shimPort > 65_535) {
     throw new Error("Shim port must be an integer from 1 to 65535");
   }
@@ -122,11 +127,8 @@ export async function initializeProject(
   if (await exists(paths.projectConfig)) {
     previous = await loadProjectConfig(paths);
   }
-  const ccrExists = await exists(paths.ccrConfig);
-  const ccr = ccrExists
-    ? await readJsonFile(paths.ccrConfig)
-    : { Providers: [], Router: {} };
-  const ccrBackup = previous?.ccrBackup ?? (ccrExists ? await backupOnce(paths.ccrConfig) : undefined);
+  const ccrExists = ccrAdapter.major === 2 && await exists(paths.ccrV2Config);
+  const ccrBackup = previous?.ccrBackup ?? (ccrExists ? await backupOnce(paths.ccrV2Config) : undefined);
   const config: ProjectConfig = {
     model: options.model,
     models: [...models],
@@ -136,7 +138,7 @@ export async function initializeProject(
     proxy: options.proxy,
     ...(ccrBackup ? { ccrBackup } : {})
   };
-  const merged = reconcileCcrConfig(ccr, {
+  await ccrAdapter.reconcile({
     shimPort: config.shimPort,
     localSecret: config.localSecret,
     model: config.model,
@@ -144,28 +146,25 @@ export async function initializeProject(
     setDefault: options.setDefault
   });
   await writeJsonAtomic(paths.projectConfig, config);
-  await writeJsonAtomic(paths.ccrConfig, merged);
   return config;
 }
 
 async function reconcileProject(
   config: ProjectConfig,
   paths: ResolvedPaths,
-  setDefault: boolean
+  setDefault: boolean,
+  ccrAdapter: CcrAdapter
 ): Promise<void> {
   const models = await listCannbotModels();
   if (!models.includes(config.model)) {
     throw new Error(`Cannbot model is not available: ${config.model}`);
   }
-  const ccrExists = await exists(paths.ccrConfig);
-  const ccr = ccrExists
-    ? await readJsonFile(paths.ccrConfig)
-    : { Providers: [], Router: {} };
+  const ccrExists = ccrAdapter.major === 2 && await exists(paths.ccrV2Config);
   const nextConfig: ProjectConfig = { ...config, models: [...models] };
   if (!nextConfig.ccrBackup && ccrExists) {
-    nextConfig.ccrBackup = await backupOnce(paths.ccrConfig);
+    nextConfig.ccrBackup = await backupOnce(paths.ccrV2Config);
   }
-  const merged = reconcileCcrConfig(ccr, {
+  await ccrAdapter.reconcile({
     shimPort: nextConfig.shimPort,
     localSecret: nextConfig.localSecret,
     model: nextConfig.model,
@@ -173,24 +172,28 @@ async function reconcileProject(
     setDefault
   });
   await writeJsonAtomic(paths.projectConfig, nextConfig);
-  await writeJsonAtomic(paths.ccrConfig, merged);
 }
 
+export async function resolveCcrAdapter(paths: ResolvedPaths): Promise<CcrAdapter> {
+  const major = await detectCcrVersion();
+  return major === 2 ? new CcrV2Adapter(paths) : new CcrV3Adapter({ paths });
+}
 export function createDefaultRouterService(
   paths: ResolvedPaths = resolvePaths()
 ): RouterService {
+  const adapter = resolveCcrAdapter(paths);
   return new RouterService({
-    initialize: (options) => initializeProject(options, { paths }),
+    initialize: async (options) => initializeProject(options, { paths, ccr: await adapter }),
     loadConfig: () => loadProjectConfig(paths),
     validateCredentials: async () => { await readCredentials(paths); },
-    reconcile: (config, setDefault) => reconcileProject(config, paths, setDefault),
+    reconcile: async (config, setDefault) => reconcileProject(config, paths, setDefault, await adapter),
     ensureShim: async (config) => { await ensureShim(config, paths); },
-    startCcr,
+    startCcr: async () => { await (await adapter).start(); },
     stopShim: (config) => stopShim(config, paths),
-    stopCcr,
-    restartCcr,
+    stopCcr: async () => (await adapter).stop(),
+    restartCcr: async () => (await adapter).restart(),
     shimStatus: async (config) => Boolean(await readShimHealth(config.shimPort)),
-    ccrStatus,
+    ccrStatus: async () => (await adapter).status(),
     runClaudeCode
   });
 }
@@ -216,6 +219,7 @@ function probeTcp(url: string, timeoutMs = 2_000): Promise<void> {
 export function createDefaultDoctorDependencies(
   paths: ResolvedPaths = resolvePaths()
 ): DoctorDependencies {
+  const adapter = resolveCcrAdapter(paths);
   return {
     nodeVersion: () => process.versions.node,
     executable: (name) => checkExecutable(
@@ -225,22 +229,17 @@ export function createDefaultDoctorDependencies(
     ccrVersion: () => detectCcrVersion(),
     credentials: async () => { await readCredentials(paths); },
     ccrConfig: async () => {
-      const [ccr, project, credentials] = await Promise.all([
-        readJsonFile(paths.ccrConfig),
+      const [project, credentials, selected] = await Promise.all([
         loadProjectConfig(paths),
-        readCredentials(paths)
+        readCredentials(paths),
+        adapter
       ]);
-      const source = JSON.stringify({ ccr, project });
+      const source = JSON.stringify(project);
       if (source.includes(credentials.accessToken) || source.includes(credentials.virtualKey)) {
         throw new Error("Cannbot credentials leaked into generated configuration");
       }
-      reconcileCcrConfig(ccr, {
-        shimPort: project.shimPort,
-        localSecret: project.localSecret,
-        model: project.model,
-        models: project.models,
-        setDefault: false
-      });
+      const connection = await selected.loadConnection();
+      if (!connection.apiKey) throw new Error("CCR local API key is missing");
     },
     proxy: async () => {
       const config = await loadProjectConfig(paths);
@@ -263,7 +262,7 @@ export function createDefaultDoctorDependencies(
         return false;
       }
     },
-    ccr: () => ccrStatus()
+    ccr: async () => (await adapter).status()
   };
 }
 

@@ -16,7 +16,7 @@ The shim reads the current Cannbot credentials for every upstream request. Cannb
 
 - Node.js 20 or newer
 - `cannbot` with an active login and virtual key
-- `@musistudio/claude-code-router` 2.0.0 or compatible
+- `@musistudio/claude-code-router` v2 or v3 (v3 requires a Node.js runtime with `node:sqlite`, such as the current Node 24 LTS)
 - Claude Code
 
 Verify the external tools:
@@ -143,6 +143,16 @@ cannbot-cc init --model glm-5.2 --proxy direct --set-default
 
 An explicitly configured proxy failure is reported; the shim does not silently fall back to a direct connection.
 
+## CCR v2 and v3 support
+
+`cannbot-cc` detects the installed CCR major version through `ccr version` before it changes CCR settings.
+
+| CCR version | Managed configuration | Service management |
+| --- | --- | --- |
+| v2 | `~/.claude-code-router/config.json` | `status`, `start`, `stop`, `restart` |
+| v3 | CCR `config.sqlite` and `api-keys.sqlite` | `start` / `stop` plus gateway `/health` polling |
+
+The request path is unchanged for both versions. v3 stores the project-managed local CCR key separately from Cannbot credentials; existing CCR providers and API keys are preserved. Run `cannbot-cc doctor` after installing or upgrading CCR to verify detection and configuration.
 ## Files and recovery
 
 - Project-owned configuration: `~/.cannbot-cc-router/config.json`

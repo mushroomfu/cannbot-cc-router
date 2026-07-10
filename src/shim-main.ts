@@ -5,6 +5,8 @@ import { rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import type { CcrAdapter } from "./ccr-adapter.js";
+import { resolveCcrAdapter } from "./default-service.js";
 import { readCredentials } from "./credentials.js";
 import { readJsonFile, writeJsonAtomic } from "./file-store.js";
 import { resolvePaths } from "./paths.js";
@@ -64,30 +66,24 @@ function configPaths(configArgument: string) {
   return { configPath, paths: resolvePaths({ home }) };
 }
 
-export async function loadShimOptions(configArgument: string): Promise<ShimOptions> {
+export interface LoadShimOptionsDependencies {
+  ccr?: CcrAdapter;
+}
+
+export async function loadShimOptions(
+  configArgument: string,
+  dependencies: LoadShimOptionsDependencies = {}
+): Promise<ShimOptions> {
   const { configPath, paths } = configPaths(configArgument);
   const config = validateConfig(await readJsonFile(configPath));
-  const rawCcr = await readJsonFile<unknown>(paths.ccrConfig);
-  if (!rawCcr || typeof rawCcr !== "object" || Array.isArray(rawCcr)) {
-    throw new Error("CCR configuration must be an object");
-  }
-  const ccr = rawCcr as Record<string, unknown>;
-  const ccrPort = ccr.PORT ?? 3456;
-  if (
-    typeof ccrPort !== "number" ||
-    !Number.isInteger(ccrPort) ||
-    ccrPort < 1 ||
-    ccrPort > 65_535
-  ) throw new Error("CCR port must be an integer from 1 to 65535");
-  if (ccr.APIKEY !== undefined && typeof ccr.APIKEY !== "string") {
-    throw new Error("CCR APIKEY must be a string");
-  }
+  const ccr = dependencies.ccr ?? await resolveCcrAdapter(paths);
+  const connection = await ccr.loadConnection();
 
   return {
     localSecret: config.localSecret,
     models: config.models,
-    ccrUrl: `http://127.0.0.1:${ccrPort}`,
-    ...(typeof ccr.APIKEY === "string" ? { ccrApiKey: ccr.APIKEY } : {}),
+    ccrUrl: connection.baseUrl,
+    ...(connection.apiKey ? { ccrApiKey: connection.apiKey } : {}),
     upstreamUrl: CANNBOT_UPSTREAM,
     proxyMode: config.proxy,
     host: "127.0.0.1",
