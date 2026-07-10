@@ -55,6 +55,9 @@ function paths(root: string): ResolvedPaths {
     projectConfig: join(root, "config.json"),
     shimState: join(root, "shim-state.json"),
     ccrConfig: join(root, "ccr.json"),
+    ccrV2Config: join(root, "ccr.json"),
+    ccrV3ConfigDb: join(root, "config.sqlite"),
+    ccrV3ApiKeysDb: join(root, "api-keys.sqlite"),
     cannbotSession: join(root, "session.json"),
     openCodeAuthCandidates: [join(root, "auth.json")]
   };

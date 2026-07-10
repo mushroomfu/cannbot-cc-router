@@ -18,6 +18,11 @@ export function resolvePaths(options: ResolvePathOptions = {}): ResolvedPaths {
   const platform = options.platform ?? process.platform;
   const env = options.env ?? process.env;
   const projectDir = join(home, ".cannbot-cc-router");
+  const v2Dir = join(home, ".claude-code-router");
+  const v3Dir = platform === "win32"
+    ? join(env.APPDATA ?? join(home, "AppData", "Roaming"), "claude-code-router")
+    : v2Dir;
+  const ccrV2Config = join(v2Dir, "config.json");
   const candidates = [
     join(env.XDG_DATA_HOME ?? join(home, ".local", "share"), "opencode", "auth.json")
   ];
@@ -34,7 +39,10 @@ export function resolvePaths(options: ResolvePathOptions = {}): ResolvedPaths {
     projectDir,
     projectConfig: join(projectDir, "config.json"),
     shimState: join(projectDir, "shim-state.json"),
-    ccrConfig: join(home, ".claude-code-router", "config.json"),
+    ccrConfig: ccrV2Config,
+    ccrV2Config,
+    ccrV3ConfigDb: join(v3Dir, "config.sqlite"),
+    ccrV3ApiKeysDb: join(v3Dir, "api-keys.sqlite"),
     cannbotSession: join(home, ".cannbot", "session.json"),
     openCodeAuthCandidates: unique(candidates)
   };

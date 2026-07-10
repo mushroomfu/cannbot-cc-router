@@ -9,6 +9,9 @@ export interface ResolvedPaths {
   projectConfig: string;
   shimState: string;
   ccrConfig: string;
+  ccrV2Config: string;
+  ccrV3ConfigDb: string;
+  ccrV3ApiKeysDb: string;
   cannbotSession: string;
   openCodeAuthCandidates: string[];
 }
