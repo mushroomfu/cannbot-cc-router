@@ -27,7 +27,10 @@ function serviceWithTrace(): { service: RouterService; trace: string[] } {
     restartCcr: async () => { trace.push("restart-ccr"); return true; },
     shimStatus: async () => { trace.push("shim-status"); return true; },
     ccrStatus: async () => { trace.push("ccr-status"); return true; },
-    runClaudeCode: async (args) => { trace.push(`claude-code:${args.join("|")}`); return 4; }
+    runClaudeCode: async (args, _config, options) => {
+      trace.push(`claude-code:${args.join("|")}:${options?.contextWindow ?? "200k"}`);
+      return 4;
+    }
   };
   return { service: new RouterService(dependencies), trace };
 }
@@ -44,9 +47,11 @@ test("start validates and reconciles before starting services", async () => {
   ]);
 });
 
-test("code starts services and passes Claude arguments unchanged", async () => {
+test("code starts services and passes Claude arguments and context unchanged", async () => {
   const { service, trace } = serviceWithTrace();
-  const code = await service.code(["-p", "hello world", "--allowedTools", "Read"]);
+  const code = await service.code(["-p", "hello world", "--allowedTools", "Read"], {
+    contextWindow: "1m"
+  });
   assert.equal(code, 4);
   assert.deepEqual(trace, [
     "load-config",
@@ -55,7 +60,7 @@ test("code starts services and passes Claude arguments unchanged", async () => {
     "ensure-shim",
     "start-ccr",
     "load-config",
-    "claude-code:-p|hello world|--allowedTools|Read"
+    "claude-code:-p|hello world|--allowedTools|Read:1m"
   ]);
 });
 

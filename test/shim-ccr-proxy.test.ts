@@ -118,6 +118,38 @@ test("rewrites a discovered model and proxies Anthropic JSON to CCR", async (t) 
   });
 });
 
+test("removes Claude's 1M context suffix before forwarding to CCR", async (t) => {
+  const captured: Captured[] = [];
+  const ccr = createServer((incoming, response) => {
+    const chunks: Buffer[] = [];
+    incoming.on("data", (chunk: Buffer) => chunks.push(chunk));
+    incoming.on("end", () => {
+      captured.push({
+        url: incoming.url ?? "",
+        headers: incoming.headers,
+        body: Buffer.concat(chunks).toString("utf8")
+      });
+      response.end("{}");
+    });
+  });
+  const ccrPort = await listen(ccr);
+  t.after(() => close(ccr));
+  const shim = shimFor(ccrPort);
+  const address = await shim.listen();
+  t.after(() => shim.close());
+
+  const result = await post(address.port, "/v1/messages", JSON.stringify({
+    model: "anthropic/cannbot/glm-5.2[1m]",
+    messages: []
+  }));
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(JSON.parse(captured[0].body), {
+    model: "cannbot,glm-5.2",
+    messages: []
+  });
+});
+
 test("streams CCR SSE responses through the Anthropic messages path", async (t) => {
   const ccr = createServer((_incoming, response) => {
     response.writeHead(200, { "content-type": "text/event-stream" });

@@ -58,6 +58,16 @@ cannbot-cc code
 
 The command reads its configuration from `~/.cannbot-cc-router/`, so it is independent of the current working directory. No reconfiguration is needed between sessions; run `cannbot-cc code` whenever you want to start coding. On first use, run `cannbot-cc init --model glm-5.2 --set-default` once beforehand (see [Quick start](#quick-start)).
 
+### 1M context for GLM-5.2
+
+Use the explicit context option when the selected Cannbot model supports a 1M context window:
+
+```powershell
+cannbot-cc code --context 1m
+```
+
+`200k` remains the default. The command temporarily maps Claude's `sonnet[1m]` alias to the configured Cannbot model and removes the `[1m]` marker before forwarding to CCR and Cannbot. Do not add `[1m]` to `cannbot-cc init --model`, the generated CCR configuration, or a manually selected Cannbot model ID. If you pass Claude's own `--model` option, it takes precedence and is left unchanged. The actual usable context still depends on the Cannbot upstream model and your account entitlement. If the upstream rejects a 1M request, return to the default with `cannbot-cc code --context 200k`.
+
 ### Reinstall after updating the code
 
 After pulling new changes from this repository, rebuild and reinstall so the global command picks up the new code:
@@ -104,7 +114,7 @@ cannbot-cc code -p "Reply with exactly hello" --output-format text
 - `cannbot-cc restart`: synchronize and restart both managed services.
 - `cannbot-cc stop`: stop the shim through its authenticated HTTP control endpoint and ask CCR to stop.
 - `cannbot-cc status [--json]`: report shim and CCR state.
-- `cannbot-cc code [...args]`: ensure both services are ready and launch Claude directly with temporary gateway-discovery settings and unchanged user arguments.
+- `cannbot-cc code [--context 200k|1m] [...args]`: ensure both services are ready and launch Claude directly with temporary gateway-discovery settings. The default is `200k`; use `--context 1m` for a selected Cannbot model that supports Claude Code's 1M context alias.
 - `cannbot-cc doctor [--json]`: inspect runtimes, credentials, configuration, proxy reachability, Cannbot reachability, and service state.
 
 `init`, `sync`, `start`, and `restart` accept `--set-default` where applicable. When set, all four managed CCR route categories use `cannbot,<selected-model>`. `init` also accepts:

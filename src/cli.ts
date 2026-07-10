@@ -34,10 +34,19 @@ interface OutputCliOptions {
   json?: boolean;
 }
 
+interface CodeCliOptions {
+  context: "200k" | "1m";
+}
+
 function numberOption(value: string): number {
   const parsed = Number(value);
   if (!Number.isInteger(parsed)) throw new Error(`Invalid integer: ${value}`);
   return parsed;
+}
+
+function contextWindowOption(value: string): "200k" | "1m" {
+  if (value === "200k" || value === "1m") return value;
+  throw new Error("Context window must be 200k or 1m");
 }
 
 async function safely(operation: () => Promise<number>): Promise<number> {
@@ -94,7 +103,10 @@ export function createDefaultHandlers(): CommandHandlers {
       else console.log(`Shim: ${status.shim ? "running" : "stopped"}; CCR: ${status.ccr ? "running" : "stopped"}`);
       return status.shim && status.ccr ? 0 : 1;
     }),
-    code: (args) => safely(() => service.code(args)),
+    code: (args, raw) => safely(() => {
+      const options = raw as CodeCliOptions;
+      return service.code(args, { contextWindow: options.context });
+    }),
     doctor: (raw) => safely(async () => {
       const options = raw as OutputCliOptions;
       const report = await runDefaultDoctor();
@@ -147,6 +159,7 @@ export function buildProgram(
   });
   program
     .command("code [args...]")
+    .option("--context <window>", "Claude context window: 200k or 1m", contextWindowOption, "200k")
     .allowUnknownOption(true)
     .action(async (args: string[] = [], options) => {
       process.exitCode = await handlers.code(args, options);

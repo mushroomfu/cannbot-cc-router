@@ -13,9 +13,12 @@ export type ClaudeSpawnFunction = (
   options: SpawnOptions
 ) => ChildProcess;
 
+export type ContextWindow = "200k" | "1m";
+
 export interface RunClaudeOptions {
   spawn?: ClaudeSpawnFunction;
   env?: NodeJS.ProcessEnv;
+  contextWindow?: ContextWindow;
 }
 
 const defaultSpawn: ClaudeSpawnFunction = (command, args, options) => {
@@ -24,6 +27,10 @@ const defaultSpawn: ClaudeSpawnFunction = (command, args, options) => {
   });
   return nodeSpawn(resolved.command, [...resolved.prefixArgs, ...args], options);
 };
+
+function hasExplicitClaudeModel(args: readonly string[]): boolean {
+  return args.some((arg) => arg === "--model" || arg === "-m" || arg.startsWith("--model="));
+}
 
 function runAttached(
   command: string,
@@ -60,6 +67,8 @@ export async function runClaudeCode(
     process.env.NO_PROXY,
     process.env.no_proxy
   ].filter(Boolean).join(","));
+  const oneMillionContext = options.contextWindow === "1m";
+  const contextModel = `anthropic/cannbot/${config.model}[1m]`;
   const settings = {
     env: {
       ANTHROPIC_BASE_URL: `http://127.0.0.1:${config.shimPort}`,
@@ -69,16 +78,23 @@ export async function runClaudeCode(
       NO_PROXY: noProxy,
       DISABLE_TELEMETRY: "true",
       DISABLE_COST_WARNINGS: "true",
-      API_TIMEOUT_MS: "600000"
+      API_TIMEOUT_MS: "600000",
+      ...(oneMillionContext ? {
+        ANTHROPIC_DEFAULT_OPUS_MODEL: contextModel,
+        ANTHROPIC_DEFAULT_SONNET_MODEL: contextModel
+      } : {})
     }
   };
+  const claudeArgs = oneMillionContext && !hasExplicitClaudeModel(args)
+    ? [...args, "--model", "sonnet[1m]"]
+    : [...args];
 
   try {
     await writeFile(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, {
       encoding: "utf8",
       mode: 0o600
     });
-    return await runAttached("claude", [...args, "--settings", settingsPath], options);
+    return await runAttached("claude", [...claudeArgs, "--settings", settingsPath], options);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

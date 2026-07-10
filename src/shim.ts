@@ -197,7 +197,10 @@ function rewriteClaudeModel(body: Buffer, models: readonly string[]): Buffer {
   }
   const requestBody = parsed as Record<string, unknown>;
   if (typeof requestBody.model === "string" && requestBody.model.startsWith("anthropic/cannbot/")) {
-    const model = requestBody.model.slice("anthropic/cannbot/".length);
+    const requestedModel = requestBody.model.slice("anthropic/cannbot/".length);
+    const model = requestedModel.endsWith("[1m]")
+      ? requestedModel.slice(0, -"[1m]".length)
+      : requestedModel;
     if (!models.includes(model)) {
       throw new UnsupportedModelError("Unsupported Cannbot model");
     }

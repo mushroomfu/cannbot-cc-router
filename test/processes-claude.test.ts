@@ -67,3 +67,61 @@ test("launches Claude with temporary gateway discovery settings", async () => {
   assert.equal(existsSync(settingsPath), false);
   assert.equal(options?.env?.NODE_NO_WARNINGS, "1");
 });
+
+test("launches the selected Cannbot model with Claude's 1M context alias", async () => {
+  let args: readonly string[] = [];
+  let settings: { env: Record<string, string> } | undefined;
+  const spawn = ((_command, receivedArgs) => {
+    args = receivedArgs;
+    const settingsIndex = receivedArgs.lastIndexOf("--settings");
+    settings = JSON.parse(readFileSync(receivedArgs[settingsIndex + 1], "utf8")) as {
+      env: Record<string, string>;
+    };
+    const child = new EventEmitter() as ChildProcess;
+    Object.assign(child, { stdin: null, stdout: null, stderr: null, kill: () => true });
+    queueMicrotask(() => child.emit("close", 0, null));
+    return child;
+  }) as SpawnFunction;
+
+  const runClaudeCode = (processes as unknown as {
+    runClaudeCode(
+      args: readonly string[],
+      config: ProjectConfig,
+      options: { spawn: SpawnFunction; contextWindow: "1m" }
+    ): Promise<number>;
+  }).runClaudeCode;
+
+  assert.equal(await runClaudeCode(["-p", "hello"], config, {
+    spawn,
+    contextWindow: "1m"
+  }), 0);
+  assert.deepEqual(args.slice(0, 4), ["-p", "hello", "--model", "sonnet[1m]"]);
+  assert.equal(settings?.env.ANTHROPIC_DEFAULT_OPUS_MODEL, "anthropic/cannbot/glm-5.2[1m]");
+  assert.equal(settings?.env.ANTHROPIC_DEFAULT_SONNET_MODEL, "anthropic/cannbot/glm-5.2[1m]");
+});
+
+test("does not override a model explicitly supplied to Claude", async () => {
+  let args: readonly string[] = [];
+  const spawn = ((_command, receivedArgs) => {
+    args = receivedArgs;
+    const child = new EventEmitter() as ChildProcess;
+    Object.assign(child, { stdin: null, stdout: null, stderr: null, kill: () => true });
+    queueMicrotask(() => child.emit("close", 0, null));
+    return child;
+  }) as SpawnFunction;
+
+  const runClaudeCode = (processes as unknown as {
+    runClaudeCode(
+      args: readonly string[],
+      config: ProjectConfig,
+      options: { spawn: SpawnFunction; contextWindow: "1m" }
+    ): Promise<number>;
+  }).runClaudeCode;
+
+  assert.equal(await runClaudeCode(["--model", "anthropic/cannbot/qwen3.7-max"], config, {
+    spawn,
+    contextWindow: "1m"
+  }), 0);
+  assert.deepEqual(args.slice(0, 2), ["--model", "anthropic/cannbot/qwen3.7-max"]);
+  assert.equal(args.includes("sonnet[1m]"), false);
+});

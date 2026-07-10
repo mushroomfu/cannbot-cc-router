@@ -1,3 +1,4 @@
+import type { ContextWindow } from "./claude-launcher.js";
 import type { ProjectConfig } from "./types.js";
 
 export interface InitOptions {
@@ -16,6 +17,10 @@ export interface RouterStatus {
   ccr: boolean;
 }
 
+export interface ClaudeCodeOptions {
+  contextWindow?: ContextWindow;
+}
+
 export interface RouterServiceDependencies {
   initialize(options: InitOptions): Promise<ProjectConfig>;
   loadConfig(): Promise<ProjectConfig>;
@@ -28,7 +33,11 @@ export interface RouterServiceDependencies {
   restartCcr(): Promise<boolean>;
   shimStatus(config: ProjectConfig): Promise<boolean>;
   ccrStatus(): Promise<boolean>;
-  runClaudeCode(args: readonly string[], config: ProjectConfig): Promise<number>;
+  runClaudeCode(
+    args: readonly string[],
+    config: ProjectConfig,
+    options?: ClaudeCodeOptions
+  ): Promise<number>;
 }
 
 export class RouterService {
@@ -74,9 +83,12 @@ export class RouterService {
     return { shim, ccr };
   }
 
-  async code(args: readonly string[]): Promise<number> {
+  async code(
+    args: readonly string[],
+    options: ClaudeCodeOptions = {}
+  ): Promise<number> {
     await this.start();
     const config = await this.dependencies.loadConfig();
-    return this.dependencies.runClaudeCode(args, config);
+    return this.dependencies.runClaudeCode(args, config, options);
   }
 }
