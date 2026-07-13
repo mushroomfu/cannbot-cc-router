@@ -10,7 +10,7 @@ Claude Code
   -> Cannbot compatible-mode gateway
 ```
 
-The shim reads the current Cannbot credentials for every upstream request. Cannbot access tokens and virtual keys are never copied into this project, CCR configuration, or Claude settings.
+The shim reads the current Cannbot credentials for every upstream request and uses the connected `cannbot-vk` as the compatible-provider Bearer credential. The Cannbot login access token is not forwarded to the model endpoint, and credentials are not copied into this project, CCR configuration, or Claude settings.
 
 ## Requirements
 
@@ -179,14 +179,14 @@ The request path is unchanged for both versions. v3 stores the project-managed l
 
 The project configuration contains the non-secret discovered model IDs and a generated loopback secret. The CLI only replaces the CCR provider named `cannbot`. Other providers and unrelated router fields are preserved. Restore a backup only while CCR is stopped.
 
-Claude gateway settings are written to a mode-0600 temporary file for the lifetime of `cannbot-cc code` and then deleted. Global Claude settings are not modified.
+Claude gateway settings are written to a mode-0600 temporary file for the lifetime of `cannbot-cc code` and then deleted. A session-scoped temporary `apiKeyHelper` returns the loopback secret; `ANTHROPIC_AUTH_TOKEN` is not injected. Global Claude settings, including permissions, hooks, plugins, and other user settings, are not modified.
 
 ## Security
 
 - The shim binds only to `127.0.0.1`.
 - Claude and CCR authenticate to the shim with a generated local bearer secret.
 - Shutdown requires both the bearer secret and the running shim's instance ID.
-- Cannbot credentials remain in Cannbot/OpenCode's existing stores and are reread per request.
+- The shim rereads Cannbot credentials per request and sends only the current `cannbot-vk` as the upstream Bearer credential; the Cannbot login access token and `x-api-vkey` are not sent to the model endpoint.
 - A 401/403 triggers one bounded Cannbot validation and one retry; it cannot loop indefinitely.
 - Internal errors returned to local clients omit secret-bearing details.
 - Confirm that your Cannbot subscription terms permit use from Claude Code.
