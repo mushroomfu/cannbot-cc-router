@@ -1,9 +1,10 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export interface CommandResolution {
   command: string;
   prefixArgs: string[];
+  entry?: string;
 }
 
 export interface ResolveCommandOptions {
@@ -45,7 +46,22 @@ export function resolveCommandSync(
 ): CommandResolution {
   const platform = options.platform ?? process.platform;
   const env = options.env ?? process.env;
-  if (platform !== "win32") return { command, prefixArgs: [] };
+  if (platform !== "win32") {
+    const pathValue = environmentValue(env, "PATH") ?? "";
+    const candidates = isAbsolute(command)
+      ? [command]
+      : pathValue.split(":").filter(Boolean).map((directory) => join(directory, command));
+    for (const candidate of candidates) {
+      if (!existsSync(candidate)) continue;
+      try {
+        const entry = realpathSync(candidate);
+        return { command, prefixArgs: [], entry };
+      } catch {
+        return { command, prefixArgs: [] };
+      }
+    }
+    return { command, prefixArgs: [] };
+  }
 
   const pathValue = environmentValue(env, "PATH") ?? "";
   const directories = pathValue.split(";").filter(Boolean);
@@ -61,7 +77,7 @@ export function resolveCommandSync(
     if (entry && extname(entry).toLowerCase() === ".exe") {
       return { command: entry, prefixArgs: [] };
     }
-    if (entry) return { command: process.execPath, prefixArgs: [entry] };
+    if (entry) return { command: process.execPath, prefixArgs: [entry], entry };
   }
   return { command, prefixArgs: [] };
 }

@@ -7,7 +7,7 @@ function healthyDependencies(overrides: Partial<DoctorDependencies> = {}): Docto
   return {
     nodeVersion: () => "24.14.0",
     executable: async () => true,
-    ccrVersion: async () => 2,
+    ccrVersion: async () => ({ major: 2, version: "2.0.0" }),
     credentials: async () => undefined,
     ccrConfig: async () => undefined,
     proxy: async () => "http://127.0.0.1:10808",

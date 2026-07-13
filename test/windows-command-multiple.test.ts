@@ -22,6 +22,7 @@ test("skips npm wrapper node.exe probe and resolves the later package entry", as
     env: { PATH: bin }
   }), {
     command: process.execPath,
-    prefixArgs: [entry]
+    prefixArgs: [entry],
+    entry
   });
 });

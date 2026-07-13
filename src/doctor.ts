@@ -1,3 +1,5 @@
+import type { DetectedCcrVersion } from "./ccr-version.js";
+
 export type DiagnosticStatus = "pass" | "warn" | "fail";
 
 export interface DiagnosticCheck {
@@ -15,7 +17,7 @@ export interface DoctorReport {
 export interface DoctorDependencies {
   nodeVersion(): string;
   executable(name: "cannbot" | "ccr" | "claude"): Promise<boolean>;
-  ccrVersion(): Promise<2 | 3>;
+  ccrVersion(): Promise<DetectedCcrVersion>;
   credentials(): Promise<void>;
   ccrConfig(): Promise<void>;
   proxy(): Promise<string>;
@@ -59,7 +61,7 @@ export async function runDoctor(dependencies: DoctorDependencies): Promise<Docto
 
   try {
     const version = await dependencies.ccrVersion();
-    checks.push({ name: "ccr-version", status: "pass", detail: `CCR v${version} is supported` });
+    checks.push({ name: "ccr-version", status: "pass", detail: `CCR ${version.version} is supported` });
   } catch {
     checks.push({
       name: "ccr-version",

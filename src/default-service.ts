@@ -175,8 +175,8 @@ async function reconcileProject(
 }
 
 export async function resolveCcrAdapter(paths: ResolvedPaths): Promise<CcrAdapter> {
-  const major = await detectCcrVersion();
-  return major === 2 ? new CcrV2Adapter(paths) : new CcrV3Adapter({ paths });
+  const detected = await detectCcrVersion();
+  return detected.major === 2 ? new CcrV2Adapter(paths) : new CcrV3Adapter({ paths });
 }
 export function createDefaultRouterService(
   paths: ResolvedPaths = resolvePaths()

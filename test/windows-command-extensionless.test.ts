@@ -21,6 +21,7 @@ test("resolves an extensionless Node entry from an npm cmd shim", async () => {
     env: { PATH: bin }
   }), {
     command: process.execPath,
-    prefixArgs: [entry]
+    prefixArgs: [entry],
+    entry
   });
 });

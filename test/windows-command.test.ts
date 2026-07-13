@@ -22,7 +22,8 @@ test("resolves a Windows npm cmd shim to its Node JavaScript entry", async () =>
     env: { PATH: bin, PATHEXT: ".COM;.EXE;.BAT;.CMD" }
   }), {
     command: process.execPath,
-    prefixArgs: [entry]
+    prefixArgs: [entry],
+    entry
   });
 });
 
