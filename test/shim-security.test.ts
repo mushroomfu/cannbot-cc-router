@@ -52,7 +52,10 @@ test("rereads credentials for every independent request", async (t) => {
     ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
-    readCredentials: async () => ({ accessToken: `token-${++reads}`, virtualKey: "key" }),
+    readCredentials: async () => ({
+      accessToken: `access-${reads}`,
+      virtualKey: `virtual-${++reads}`
+    }),
     refreshCredentials: async () => undefined
   });
   const address = await shim.listen();
@@ -60,7 +63,7 @@ test("rereads credentials for every independent request", async (t) => {
 
   await post(address.port);
   await post(address.port);
-  assert.deepEqual(received, ["Bearer token-1", "Bearer token-2"]);
+  assert.deepEqual(received, ["Bearer virtual-1", "Bearer virtual-2"]);
 });
 
 test("does not expose internal error details to local clients", async (t) => {

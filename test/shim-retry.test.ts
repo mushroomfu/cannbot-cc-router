@@ -50,7 +50,7 @@ test("refreshes once and retries with newly read credentials", async (t) => {
   const upstreamPort = await listen(upstream);
   t.after(() => close(upstream));
 
-  let token = "old-token";
+  let credentialReads = 0;
   let refreshes = 0;
   const shim = createShim({
     localSecret: "local-secret",
@@ -58,10 +58,12 @@ test("refreshes once and retries with newly read credentials", async (t) => {
     ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
-    readCredentials: async () => ({ accessToken: token, virtualKey: "virtual" }),
+    readCredentials: async () => ({
+      accessToken: `access-${credentialReads}`,
+      virtualKey: `virtual-${++credentialReads}`
+    }),
     refreshCredentials: async () => {
       refreshes += 1;
-      token = "new-token";
     }
   });
   const address = await shim.listen();
@@ -69,16 +71,18 @@ test("refreshes once and retries with newly read credentials", async (t) => {
 
   assert.deepEqual(await post(address.port), { status: 200, body: "ok" });
   assert.equal(refreshes, 1);
-  assert.deepEqual(authorizations, ["Bearer old-token", "Bearer new-token"]);
+  assert.deepEqual(authorizations, ["Bearer virtual-1", "Bearer virtual-2"]);
 });
 
 test("shares one refresh across concurrent authentication failures", async (t) => {
-  let token = "old-token";
+  let credentialReads = 0;
   let refreshes = 0;
+  const authorizations: Array<string | undefined> = [];
   let requests = 0;
   const upstream = createServer((incoming, response) => {
     requests += 1;
-    if (incoming.headers.authorization === "Bearer old-token") response.writeHead(401).end();
+    authorizations.push(incoming.headers.authorization);
+    if (authorizations.length <= 2) response.writeHead(401).end();
     else response.writeHead(200).end("ok");
   });
   const upstreamPort = await listen(upstream);
@@ -90,11 +94,13 @@ test("shares one refresh across concurrent authentication failures", async (t) =
     ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
-    readCredentials: async () => ({ accessToken: token, virtualKey: "virtual" }),
+    readCredentials: async () => ({
+      accessToken: `access-${credentialReads}`,
+      virtualKey: `virtual-${++credentialReads}`
+    }),
     refreshCredentials: async () => {
       refreshes += 1;
       await new Promise((resolve) => setTimeout(resolve, 25));
-      token = "new-token";
     }
   });
   const address = await shim.listen();
@@ -104,6 +110,12 @@ test("shares one refresh across concurrent authentication failures", async (t) =
   assert.deepEqual(results.map((result) => result.status), [200, 200]);
   assert.equal(refreshes, 1);
   assert.equal(requests, 4);
+  assert.deepEqual([...authorizations].sort(), [
+    "Bearer virtual-1",
+    "Bearer virtual-2",
+    "Bearer virtual-3",
+    "Bearer virtual-4"
+  ].sort());
 });
 
 test("does not retry a second authentication failure", async (t) => {

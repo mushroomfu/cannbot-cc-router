@@ -117,8 +117,7 @@ function upstreamHeaders(
   body: Buffer
 ): Record<string, string | string[]> {
   const headers = copiedHeaders(incoming);
-  headers.authorization = `Bearer ${credentials.accessToken}`;
-  headers["x-api-vkey"] = credentials.virtualKey;
+  headers.authorization = `Bearer ${credentials.virtualKey}`;
   headers["content-length"] = String(body.byteLength);
   return headers;
 }
