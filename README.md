@@ -16,14 +16,15 @@ The shim reads the current Cannbot credentials for every upstream request. Cannb
 
 - Node.js 20 or newer
 - `cannbot` with an active login and virtual key
-- `@musistudio/claude-code-router` v2 or v3 (v3 requires a Node.js runtime with `node:sqlite`, such as the current Node 24 LTS)
+- `@musistudio/claude-code-router` v2 or v3.0.x (v3 requires a Node.js runtime with `node:sqlite`; Node 24 LTS is recommended)
 - Claude Code
 
 Verify the external tools:
 
 ```powershell
 cannbot --version
-ccr version
+ccr --help
+cannbot-cc doctor
 claude --version
 ```
 
@@ -143,22 +144,38 @@ cannbot-cc init --model glm-5.2 --proxy direct --set-default
 
 An explicitly configured proxy failure is reported; the shim does not silently fall back to a direct connection.
 
-## CCR v2 and v3 support
+## CCR v2 and v3.0.x support
 
-`cannbot-cc` detects the installed CCR major version through `ccr version` before it changes CCR settings.
+`cannbot-cc` detects CCR from the installed `@musistudio/claude-code-router` package metadata, with the legacy `ccr version` command as a v2 fallback. CCR v1, v3.1 or newer, v4, and unrecognized installations are rejected before configuration changes.
 
 | CCR version | Managed configuration | Service management |
 | --- | --- | --- |
 | v2 | `~/.claude-code-router/config.json` | `status`, `start`, `stop`, `restart` |
-| v3 | CCR `config.sqlite` and `api-keys.sqlite` | `start` / `stop` plus gateway `/health` polling |
+| v3.0.x on Windows | `%APPDATA%\claude-code-router\config.sqlite` and `api-keys.sqlite` | `start` / `stop` plus gateway `/health` polling |
+| v3.0.x on Linux/macOS | `~/.claude-code-router/config.sqlite` and `~/.claude-code-router/app-data/api-keys.sqlite` | `start` / `stop` plus gateway `/health` polling |
+
+Direct v3 `init` or `sync` refuses to write while the CCR gateway is running. Managed `start` and `restart` commands stop a running v3 service, synchronize while stopped, and then restore service health.
+
+Before its first managed v3 update, `cannbot-cc` stores a complete database backup under `~/.cannbot-cc-router/` and records the directory in `ccr-v3-backup.txt`. Each update also uses a short-lived rollback snapshot so a second-database failure restores the state from immediately before that operation.
+
+To recover v3 manually:
+
+1. Stop CCR and confirm its `/health` endpoint is unavailable.
+2. Read the backup directory from `~/.cannbot-cc-router/ccr-v3-backup.txt`.
+3. Replace both CCR databases and matching `-wal` / `-shm` companions from that directory.
+4. Run `cannbot-cc doctor`, then start CCR.
 
 The request path is unchanged for both versions. v3 stores the project-managed local CCR key separately from Cannbot credentials; existing CCR providers and API keys are preserved. Run `cannbot-cc doctor` after installing or upgrading CCR to verify detection and configuration.
+
 ## Files and recovery
 
 - Project-owned configuration: `~/.cannbot-cc-router/config.json`
 - Shim state: `~/.cannbot-cc-router/shim-state.json`
 - CCR configuration: `~/.claude-code-router/config.json`
 - First CCR backup: `~/.claude-code-router/config.json.backup-YYYYMMDD-HHmmss`
+- CCR v3 configuration: platform-specific `config.sqlite` described above
+- CCR v3 API keys: platform-specific `api-keys.sqlite` described above
+- CCR v3 first backup marker: `~/.cannbot-cc-router/ccr-v3-backup.txt`
 
 The project configuration contains the non-secret discovered model IDs and a generated loopback secret. The CLI only replaces the CCR provider named `cannbot`. Other providers and unrelated router fields are preserved. Restore a backup only while CCR is stopped.
 
