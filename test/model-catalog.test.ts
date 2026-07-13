@@ -5,6 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { reconcileCcrConfig } from "../src/ccr-config.js";
+import { CcrV2Adapter } from "../src/ccr-v2-adapter.js";
 import {
   initializeProject,
   listCannbotModels,
@@ -73,6 +74,7 @@ test("initialization persists all models and manages all Cannbot routes", async 
     setDefault: true
   }, {
     paths,
+    ccr: new CcrV2Adapter(paths),
     listModels: async () => ["deepseek-v4-pro", "glm-5.2"],
     secret: () => "local-secret"
   });
