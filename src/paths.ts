@@ -19,9 +19,15 @@ export function resolvePaths(options: ResolvePathOptions = {}): ResolvedPaths {
   const env = options.env ?? process.env;
   const projectDir = join(home, ".cannbot-cc-router");
   const v2Dir = join(home, ".claude-code-router");
+  const internalHome = env.CCR_INTERNAL_HOME_DIR?.trim() || undefined;
+  const internalAppData = env.CCR_INTERNAL_APP_DATA_DIR?.trim() || undefined;
+  const internalUserData = env.CCR_INTERNAL_USER_DATA_DIR?.trim() || undefined;
   const v3Dir = platform === "win32"
-    ? join(env.APPDATA ?? join(home, "AppData", "Roaming"), "claude-code-router")
-    : v2Dir;
+    ? join(internalAppData ?? env.APPDATA ?? join(home, "AppData", "Roaming"), "claude-code-router")
+    : join(internalHome ?? home, ".claude-code-router");
+  const v3UserData = internalUserData ?? (platform === "win32"
+    ? v3Dir
+    : join(v3Dir, "app-data"));
   const ccrV2Config = join(v2Dir, "config.json");
   const candidates = [
     join(env.XDG_DATA_HOME ?? join(home, ".local", "share"), "opencode", "auth.json")
@@ -42,7 +48,7 @@ export function resolvePaths(options: ResolvePathOptions = {}): ResolvedPaths {
     ccrConfig: ccrV2Config,
     ccrV2Config,
     ccrV3ConfigDb: join(v3Dir, "config.sqlite"),
-    ccrV3ApiKeysDb: join(v3Dir, "api-keys.sqlite"),
+    ccrV3ApiKeysDb: join(v3UserData, "api-keys.sqlite"),
     cannbotSession: join(home, ".cannbot", "session.json"),
     openCodeAuthCandidates: unique(candidates)
   };
