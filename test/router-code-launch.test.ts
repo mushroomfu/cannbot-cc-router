@@ -20,6 +20,7 @@ test("code starts services then launches Claude directly with refreshed config",
     loadConfig: async () => { trace.push("load"); return config; },
     validateCredentials: async () => { trace.push("credentials"); },
     reconcile: async () => { trace.push("reconcile"); },
+    prepareCcrForReconcile: async () => { trace.push("prepare"); },
     ensureShim: async () => { trace.push("shim"); },
     startCcr: async () => { trace.push("ccr"); },
     stopShim: async () => true,
@@ -36,6 +37,7 @@ test("code starts services then launches Claude directly with refreshed config",
 
   assert.equal(await service.code(["-p", "hello"]), 4);
   assert.deepEqual(trace, [
+    "prepare",
     "load",
     "credentials",
     "reconcile",

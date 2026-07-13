@@ -19,6 +19,7 @@ function serviceWithTrace(): { service: RouterService; trace: string[] } {
     initialize: async () => { trace.push("initialize"); return config; },
     loadConfig: async () => { trace.push("load-config"); return config; },
     validateCredentials: async () => { trace.push("validate-credentials"); },
+    prepareCcrForReconcile: async () => { trace.push("prepare-ccr"); },
     reconcile: async (_config, setDefault) => { trace.push(`reconcile:${setDefault}`); },
     ensureShim: async () => { trace.push("ensure-shim"); },
     startCcr: async () => { trace.push("start-ccr"); },
@@ -39,6 +40,7 @@ test("start validates and reconciles before starting services", async () => {
   const { service, trace } = serviceWithTrace();
   await service.start({ setDefault: false });
   assert.deepEqual(trace, [
+    "prepare-ccr",
     "load-config",
     "validate-credentials",
     "reconcile:false",
@@ -54,6 +56,7 @@ test("code starts services and passes Claude arguments and context unchanged", a
   });
   assert.equal(code, 4);
   assert.deepEqual(trace, [
+    "prepare-ccr",
     "load-config",
     "validate-credentials",
     "reconcile:false",
@@ -69,9 +72,10 @@ test("restart refreshes the shim before restarting CCR", async () => {
   await service.restart({ setDefault: true });
   assert.deepEqual(trace, [
     "load-config",
+    "stop-shim",
+    "prepare-ccr",
     "validate-credentials",
     "reconcile:true",
-    "stop-shim",
     "ensure-shim",
     "restart-ccr"
   ]);

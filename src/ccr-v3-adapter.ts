@@ -80,6 +80,9 @@ export class CcrV3Adapter implements CcrAdapter {
 
   async reconcile(options: ReconcileOptions): Promise<void> {
     await backupV3DatabasesOnce(this.dependencies.paths);
+    if (await this.status()) {
+      throw new Error("CCR v3 is running; stop CCR before synchronizing configuration");
+    }
     const snapshot = await snapshotV3Databases(this.dependencies.paths);
     try {
       const store = await this.store();

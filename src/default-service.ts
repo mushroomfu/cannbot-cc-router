@@ -187,6 +187,13 @@ export function createDefaultRouterService(
     loadConfig: () => loadProjectConfig(paths),
     validateCredentials: async () => { await readCredentials(paths); },
     reconcile: async (config, setDefault) => reconcileProject(config, paths, setDefault, await adapter),
+    prepareCcrForReconcile: async () => {
+      const selected = await adapter;
+      if (selected.major !== 3 || !await selected.status()) return;
+      if (!await selected.stop()) {
+        throw new Error("CCR v3 must stop before synchronizing configuration");
+      }
+    },
     ensureShim: async (config) => { await ensureShim(config, paths); },
     startCcr: async () => { await (await adapter).start(); },
     stopShim: (config) => stopShim(config, paths),

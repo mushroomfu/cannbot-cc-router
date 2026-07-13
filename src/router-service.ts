@@ -25,6 +25,7 @@ export interface RouterServiceDependencies {
   initialize(options: InitOptions): Promise<ProjectConfig>;
   loadConfig(): Promise<ProjectConfig>;
   validateCredentials(): Promise<void>;
+  prepareCcrForReconcile(): Promise<void>;
   reconcile(config: ProjectConfig, setDefault: boolean): Promise<void>;
   ensureShim(config: ProjectConfig): Promise<void>;
   startCcr(): Promise<void>;
@@ -55,14 +56,18 @@ export class RouterService {
   }
 
   async start(options: SyncOptions = { setDefault: false }): Promise<void> {
+    await this.dependencies.prepareCcrForReconcile();
     const config = await this.sync(options);
     await this.dependencies.ensureShim(config);
     await this.dependencies.startCcr();
   }
 
   async restart(options: SyncOptions = { setDefault: false }): Promise<void> {
-    const config = await this.sync(options);
+    const config = await this.dependencies.loadConfig();
     await this.dependencies.stopShim(config);
+    await this.dependencies.prepareCcrForReconcile();
+    await this.dependencies.validateCredentials();
+    await this.dependencies.reconcile(config, options.setDefault);
     await this.dependencies.ensureShim(config);
     if (!await this.dependencies.restartCcr()) {
       throw new Error("CCR restart failed");
