@@ -41,10 +41,12 @@ function post(port: number): Promise<{ status: number; body: string }> {
 }
 
 test("refreshes once and retries with newly read credentials", async (t) => {
-  const authorizations: Array<string | undefined> = [];
+  const receivedCredentials: string[] = [];
   const upstream = createServer((incoming, response) => {
-    authorizations.push(incoming.headers.authorization);
-    if (authorizations.length === 1) response.writeHead(401).end("expired");
+    receivedCredentials.push(
+      `${incoming.headers.authorization}|${incoming.headers["x-api-vkey"]}`
+    );
+    if (receivedCredentials.length === 1) response.writeHead(401).end("expired");
     else response.writeHead(200).end("ok");
   });
   const upstreamPort = await listen(upstream);
@@ -74,18 +76,23 @@ test("refreshes once and retries with newly read credentials", async (t) => {
 
   assert.deepEqual(await post(address.port), { status: 200, body: "ok" });
   assert.equal(refreshes, 1);
-  assert.deepEqual(authorizations, ["Bearer virtual-1", "Bearer virtual-2"]);
+  assert.deepEqual(receivedCredentials, [
+    "Bearer access-1|virtual-1",
+    "Bearer access-2|virtual-2"
+  ]);
 });
 
 test("shares one refresh across concurrent authentication failures", async (t) => {
   let credentialReads = 0;
   let refreshes = 0;
-  const authorizations: Array<string | undefined> = [];
+  const receivedCredentials: string[] = [];
   let requests = 0;
   const upstream = createServer((incoming, response) => {
     requests += 1;
-    authorizations.push(incoming.headers.authorization);
-    if (authorizations.length <= 2) response.writeHead(401).end();
+    receivedCredentials.push(
+      `${incoming.headers.authorization}|${incoming.headers["x-api-vkey"]}`
+    );
+    if (receivedCredentials.length <= 2) response.writeHead(401).end();
     else response.writeHead(200).end("ok");
   });
   const upstreamPort = await listen(upstream);
@@ -116,11 +123,11 @@ test("shares one refresh across concurrent authentication failures", async (t) =
   assert.deepEqual(results.map((result) => result.status), [200, 200]);
   assert.equal(refreshes, 1);
   assert.equal(requests, 4);
-  assert.deepEqual([...authorizations].sort(), [
-    "Bearer virtual-1",
-    "Bearer virtual-2",
-    "Bearer virtual-3",
-    "Bearer virtual-4"
+  assert.deepEqual([...receivedCredentials].sort(), [
+    "Bearer access-1|virtual-1",
+    "Bearer access-2|virtual-2",
+    "Bearer access-3|virtual-3",
+    "Bearer access-4|virtual-4"
   ].sort());
 });
 

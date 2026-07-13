@@ -38,9 +38,11 @@ function post(port: number): Promise<{ status: number; body: string }> {
 }
 
 test("rereads credentials for every independent request", async (t) => {
-  const received: Array<string | undefined> = [];
+  const received: string[] = [];
   const upstream = createServer((incoming, response) => {
-    received.push(incoming.headers.authorization);
+    received.push(
+      `${incoming.headers.authorization}|${incoming.headers["x-api-vkey"]}`
+    );
     response.end("ok");
   });
   const upstreamPort = await listen(upstream);
@@ -66,7 +68,10 @@ test("rereads credentials for every independent request", async (t) => {
 
   await post(address.port);
   await post(address.port);
-  assert.deepEqual(received, ["Bearer virtual-1", "Bearer virtual-2"]);
+  assert.deepEqual(received, [
+    "Bearer access-1|virtual-1",
+    "Bearer access-2|virtual-2"
+  ]);
 });
 
 test("does not expose internal error details to local clients", async (t) => {

@@ -88,17 +88,17 @@ test("authenticates locally and injects current Cannbot credentials", async (t) 
 
   const body = '{"model":"glm-5.2","stream":true}';
   const result = await post(shimAddress.port, "Bearer local-secret", body, {
-    "x-api-key": "access-secret",
+    "x-api-key": "attacker-api-key",
     "x-api-vkey": "attacker-vkey"
   });
 
   assert.deepEqual(result, { status: 200, body: '{"ok":true}' });
   assert.equal(captured.length, 1);
   assert.equal(captured[0].body, body);
-  assert.equal(captured[0].headers.authorization, "Bearer virtual-secret");
+  assert.equal(captured[0].headers.authorization, "Bearer access-secret");
   assert.equal(captured[0].headers["x-api-key"], undefined);
-  assert.equal(captured[0].headers["x-api-vkey"], undefined);
-  assert.doesNotMatch(JSON.stringify(captured[0].headers), /access-secret/);
+  assert.equal(captured[0].headers["x-api-vkey"], "virtual-secret");
+  assert.doesNotMatch(JSON.stringify(captured[0].headers), /attacker/);
   assert.equal(captured[0].headers.host, `127.0.0.1:${upstreamPort}`);
 });
 
