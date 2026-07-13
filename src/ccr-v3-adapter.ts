@@ -4,7 +4,14 @@ import type { CcrAdapter, CcrConnection } from "./ccr-adapter.js";
 import { reconcileCcrConfig, type ReconcileOptions } from "./ccr-config.js";
 import type { CcrVersionRunner } from "./ccr-version.js";
 import { runCaptured } from "./processes.js";
-import { backupV3DatabasesOnce, openV3Store, type V3Store } from "./ccr-v3-store.js";
+import {
+  backupV3DatabasesOnce,
+  discardV3Snapshot,
+  openV3Store,
+  restoreV3Databases,
+  snapshotV3Databases,
+  type V3Store
+} from "./ccr-v3-store.js";
 import type { ResolvedPaths } from "./types.js";
 
 export interface CcrV3AdapterDependencies {
@@ -73,12 +80,20 @@ export class CcrV3Adapter implements CcrAdapter {
 
   async reconcile(options: ReconcileOptions): Promise<void> {
     await backupV3DatabasesOnce(this.dependencies.paths);
-    const store = await this.store();
+    const snapshot = await snapshotV3Databases(this.dependencies.paths);
     try {
-      await store.writeConfig(reconcileCcrConfig(await store.readConfig(), options));
-      await store.upsertManagedApiKey(options.localSecret);
+      const store = await this.store();
+      try {
+        await store.writeConfig(reconcileCcrConfig(await store.readConfig(), options));
+        await store.upsertManagedApiKey(options.localSecret);
+      } finally {
+        await store.close();
+      }
+    } catch (error) {
+      await restoreV3Databases(this.dependencies.paths, snapshot);
+      throw error;
     } finally {
-      await store.close();
+      await discardV3Snapshot(snapshot);
     }
   }
 
