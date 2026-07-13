@@ -75,7 +75,7 @@ export async function runDoctor(dependencies: DoctorDependencies): Promise<Docto
     "credentials",
     dependencies.credentials,
     "Cannbot credentials are available",
-    "Run `cannbot auth login` and `cannbot connect`"
+    "Run `cannbot connect`"
   ));
   checks.push(await checked(
     "ccr-config",

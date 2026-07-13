@@ -3,9 +3,6 @@ import { access, readFile } from "node:fs/promises";
 import type { CannbotCredentials, ResolvedPaths } from "./types.js";
 
 export type CredentialsErrorCode =
-  | "SESSION_MISSING"
-  | "SESSION_INVALID"
-  | "ACCESS_TOKEN_MISSING"
   | "AUTH_MISSING"
   | "AUTH_INVALID"
   | "VIRTUAL_KEY_MISSING";
@@ -64,20 +61,6 @@ async function firstExisting(paths: string[]): Promise<string | undefined> {
 export async function readCredentials(
   paths: ResolvedPaths
 ): Promise<CannbotCredentials> {
-  const session = await parseJsonFile(
-    paths.cannbotSession,
-    "SESSION_MISSING",
-    "SESSION_INVALID",
-    "Cannbot session"
-  );
-  const accessToken = session.accessToken;
-  if (typeof accessToken !== "string" || accessToken.trim() === "") {
-    throw new CredentialsError(
-      "ACCESS_TOKEN_MISSING",
-      "Cannbot access token is missing; run `cannbot auth login`"
-    );
-  }
-
   const authPath = await firstExisting(paths.openCodeAuthCandidates);
   if (!authPath) {
     throw new CredentialsError(
@@ -103,5 +86,5 @@ export async function readCredentials(
     );
   }
 
-  return { accessToken, virtualKey };
+  return { virtualKey };
 }

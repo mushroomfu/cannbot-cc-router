@@ -49,7 +49,6 @@ export function resolvePaths(options: ResolvePathOptions = {}): ResolvedPaths {
     ccrV2Config,
     ccrV3ConfigDb: join(v3Dir, "config.sqlite"),
     ccrV3ApiKeysDb: join(v3UserData, "api-keys.sqlite"),
-    cannbotSession: join(home, ".cannbot", "session.json"),
     openCodeAuthCandidates: unique(candidates)
   };
 }

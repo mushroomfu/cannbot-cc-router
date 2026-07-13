@@ -1,5 +1,4 @@
 export interface CannbotCredentials {
-  accessToken: string;
   virtualKey: string;
 }
 
@@ -12,7 +11,6 @@ export interface ResolvedPaths {
   ccrV2Config: string;
   ccrV3ConfigDb: string;
   ccrV3ApiKeysDb: string;
-  cannbotSession: string;
   openCodeAuthCandidates: string[];
 }
 

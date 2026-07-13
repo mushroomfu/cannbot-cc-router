@@ -53,7 +53,6 @@ test("rereads credentials for every independent request", async (t) => {
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
     readCredentials: async () => ({
-      accessToken: `access-${reads}`,
       virtualKey: `virtual-${++reads}`
     }),
     refreshCredentials: async () => undefined

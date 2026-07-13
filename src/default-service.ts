@@ -250,7 +250,7 @@ export function createDefaultDoctorDependencies(
         adapter
       ]);
       const source = JSON.stringify(project);
-      if (source.includes(credentials.accessToken) || source.includes(credentials.virtualKey)) {
+      if (source.includes(credentials.virtualKey)) {
         throw new Error("Cannbot credentials leaked into generated configuration");
       }
       await selected.validateManagedState(project);

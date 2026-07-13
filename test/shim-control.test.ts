@@ -57,7 +57,7 @@ test("reports health and requires both secret and instance marker to stop", asyn
     ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: "http://127.0.0.1:1/v1/chat/completions",
     proxyMode: "direct",
-    readCredentials: async () => ({ accessToken: "token", virtualKey: "key" }),
+    readCredentials: async () => ({ virtualKey: "key" }),
     refreshCredentials: async () => undefined
   });
   const address = await shim.listen();
@@ -107,7 +107,7 @@ test("rejects a request body larger than the configured limit", async (t) => {
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
     maxBodyBytes: 5,
-    readCredentials: async () => ({ accessToken: "token", virtualKey: "key" }),
+    readCredentials: async () => ({ virtualKey: "key" }),
     refreshCredentials: async () => undefined
   });
   const address = await shim.listen();

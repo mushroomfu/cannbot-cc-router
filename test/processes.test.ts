@@ -58,7 +58,6 @@ function paths(root: string): ResolvedPaths {
     ccrV2Config: join(root, "ccr.json"),
     ccrV3ConfigDb: join(root, "config.sqlite"),
     ccrV3ApiKeysDb: join(root, "api-keys.sqlite"),
-    cannbotSession: join(root, "session.json"),
     openCodeAuthCandidates: [join(root, "auth.json")]
   };
 }
@@ -122,7 +121,7 @@ test("stopShim uses authenticated HTTP shutdown instead of killing a PID", async
     ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: "http://127.0.0.1:1/v1/chat/completions",
     proxyMode: "direct",
-    readCredentials: async () => ({ accessToken: "token", virtualKey: "key" }),
+    readCredentials: async () => ({ virtualKey: "key" }),
     refreshCredentials: async () => undefined
   });
   const address = await shim.listen();

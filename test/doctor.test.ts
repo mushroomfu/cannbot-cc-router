@@ -65,3 +65,21 @@ test("unsupported CCR versions fail doctor", async () => {
   assert.equal(report.ok, false);
   assert.equal(report.checks.find((check) => check.name === "ccr-version")?.status, "fail");
 });
+
+test("credential failures direct users to cannbot connect", async () => {
+  const report = await runDoctor(healthyDependencies({
+    credentials: async () => {
+      throw new Error("missing virtual key");
+    }
+  }));
+
+  assert.deepEqual(
+    report.checks.find((check) => check.name === "credentials"),
+    {
+      name: "credentials",
+      status: "fail",
+      detail: "check failed",
+      action: "Run `cannbot connect`"
+    }
+  );
+});

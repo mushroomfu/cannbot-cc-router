@@ -52,7 +52,6 @@ test("loads legacy project configuration with its selected model as the catalog"
 test("initialization persists all models and manages all Cannbot routes", async () => {
   const home = await mkdtemp(join(tmpdir(), "cannbot-model-catalog-"));
   const paths = resolvePaths({ home, platform: "linux" });
-  await writeJsonAtomic(paths.cannbotSession, { accessToken: "access-secret" });
   await writeJsonAtomic(paths.openCodeAuthCandidates[0], {
     "cannbot-vk": { key: "virtual-secret" }
   });

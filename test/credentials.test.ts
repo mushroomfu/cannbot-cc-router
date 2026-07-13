@@ -16,60 +16,63 @@ async function temporaryHome(): Promise<string> {
   return mkdtemp(join(tmpdir(), "cannbot-cc-credentials-"));
 }
 
-test("reads current access token and virtual key", async () => {
+test("reads the virtual key without a Cannbot session", async () => {
   const paths = resolvePaths({ home: await temporaryHome(), platform: "linux" });
-  await writeJson(paths.cannbotSession, { accessToken: "access-secret" });
   await writeJson(paths.openCodeAuthCandidates[0], {
-    cannbot: { type: "oauth", access: "oauth-access", refresh: "refresh-secret" },
     "cannbot-vk": { type: "api", key: "virtual-secret" }
   });
 
   assert.deepEqual(await readCredentials(paths), {
-    accessToken: "access-secret",
     virtualKey: "virtual-secret"
   });
+});
+
+test("ignores Cannbot OAuth access state", async () => {
+  for (const cannbot of [
+    undefined,
+    { type: "oauth", access: "", refresh: "" },
+    { type: "oauth", access: "oauth-access", refresh: "refresh-secret" }
+  ]) {
+    const paths = resolvePaths({ home: await temporaryHome(), platform: "linux" });
+    await writeJson(paths.openCodeAuthCandidates[0], {
+      ...(cannbot === undefined ? {} : { cannbot }),
+      "cannbot-vk": { type: "api", key: "virtual-secret" }
+    });
+    assert.deepEqual(await readCredentials(paths), { virtualKey: "virtual-secret" });
+  }
 });
 
 test("supports the Windows OpenCode auth candidate", async () => {
   const home = await temporaryHome();
   const appData = join(home, "AppData", "Roaming");
   const paths = resolvePaths({ home, platform: "win32", env: { APPDATA: appData } });
-  await writeJson(paths.cannbotSession, { accessToken: "access-secret" });
   await writeJson(paths.openCodeAuthCandidates.at(-1)!, {
     "cannbot-vk": { key: "virtual-secret" }
   });
 
-  assert.equal((await readCredentials(paths)).virtualKey, "virtual-secret");
+  assert.deepEqual(await readCredentials(paths), { virtualKey: "virtual-secret" });
 });
 
-test("reports a missing Cannbot session", async () => {
+test("reports missing OpenCode authentication", async () => {
   const paths = resolvePaths({ home: await temporaryHome(), platform: "linux" });
-  await assert.rejects(readCredentials(paths), (error: unknown) => {
-    assert.ok(error instanceof CredentialsError);
-    assert.equal(error.code, "SESSION_MISSING");
-    return true;
-  });
+  await assert.rejects(readCredentials(paths), { code: "AUTH_MISSING" });
 });
 
-test("reports malformed credential JSON without exposing content", async () => {
+test("reports malformed OpenCode authentication without exposing content", async () => {
   const paths = resolvePaths({ home: await temporaryHome(), platform: "linux" });
-  await mkdir(dirname(paths.cannbotSession), { recursive: true });
-  await writeFile(paths.cannbotSession, "{not-json access-secret", "utf8");
+  await mkdir(dirname(paths.openCodeAuthCandidates[0]), { recursive: true });
+  await writeFile(paths.openCodeAuthCandidates[0], "{not-json access-secret", "utf8");
 
   await assert.rejects(readCredentials(paths), (error: unknown) => {
     assert.ok(error instanceof CredentialsError);
-    assert.equal(error.code, "SESSION_INVALID");
+    assert.equal(error.code, "AUTH_INVALID");
     assert.doesNotMatch(error.message, /access-secret/);
     return true;
   });
 });
 
-test("requires non-empty access token and virtual key", async () => {
+test("requires a non-empty virtual key", async () => {
   const paths = resolvePaths({ home: await temporaryHome(), platform: "linux" });
-  await writeJson(paths.cannbotSession, { accessToken: "" });
-  await assert.rejects(readCredentials(paths), { code: "ACCESS_TOKEN_MISSING" });
-
-  await writeJson(paths.cannbotSession, { accessToken: "access-secret" });
   await writeJson(paths.openCodeAuthCandidates[0], { "cannbot-vk": { key: "" } });
   await assert.rejects(readCredentials(paths), { code: "VIRTUAL_KEY_MISSING" });
 });

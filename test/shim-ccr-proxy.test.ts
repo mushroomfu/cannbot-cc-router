@@ -72,7 +72,6 @@ function shimFor(ccrPort: number) {
     upstreamUrl: "http://127.0.0.1:1/v1/chat/completions",
     proxyMode: "direct",
     readCredentials: async () => ({
-      accessToken: "cannbot-access-secret",
       virtualKey: "cannbot-virtual-secret"
     }),
     refreshCredentials: async () => undefined

@@ -59,7 +59,6 @@ test("refreshes once and retries with newly read credentials", async (t) => {
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
     readCredentials: async () => ({
-      accessToken: `access-${credentialReads}`,
       virtualKey: `virtual-${++credentialReads}`
     }),
     refreshCredentials: async () => {
@@ -95,7 +94,6 @@ test("shares one refresh across concurrent authentication failures", async (t) =
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
     readCredentials: async () => ({
-      accessToken: `access-${credentialReads}`,
       virtualKey: `virtual-${++credentialReads}`
     }),
     refreshCredentials: async () => {
@@ -134,7 +132,7 @@ test("does not retry a second authentication failure", async (t) => {
     ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
-    readCredentials: async () => ({ accessToken: "token", virtualKey: "virtual" }),
+    readCredentials: async () => ({ virtualKey: "virtual" }),
     refreshCredentials: async () => { refreshes += 1; }
   });
   const address = await shim.listen();
@@ -161,7 +159,7 @@ test("streams SSE chunks before the upstream response ends", async (t) => {
     ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
-    readCredentials: async () => ({ accessToken: "token", virtualKey: "virtual" }),
+    readCredentials: async () => ({ virtualKey: "virtual" }),
     refreshCredentials: async () => undefined
   });
   const address = await shim.listen();

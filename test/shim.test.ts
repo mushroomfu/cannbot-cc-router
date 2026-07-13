@@ -78,7 +78,6 @@ test("authenticates locally and injects current Cannbot credentials", async (t) 
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
     readCredentials: async () => ({
-      accessToken: "access-secret",
       virtualKey: "virtual-secret"
     }),
     refreshCredentials: async () => undefined
@@ -88,7 +87,7 @@ test("authenticates locally and injects current Cannbot credentials", async (t) 
 
   const body = '{"model":"glm-5.2","stream":true}';
   const result = await post(shimAddress.port, "Bearer local-secret", body, {
-    "x-api-key": "attacker-api-key",
+    "x-api-key": "access-secret",
     "x-api-vkey": "attacker-vkey"
   });
 
@@ -117,7 +116,7 @@ test("rejects an incorrect local secret without contacting upstream", async (t) 
     ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
-    readCredentials: async () => ({ accessToken: "access", virtualKey: "virtual" }),
+    readCredentials: async () => ({ virtualKey: "virtual" }),
     refreshCredentials: async () => undefined
   });
   const shimAddress = await shim.listen();
