@@ -4,17 +4,29 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { DatabaseSync } from "node:sqlite";
 
 import { CcrV3Adapter } from "../src/ccr-v3-adapter.js";
 import { resolvePaths } from "../src/paths.js";
 import { openV3Store } from "../src/ccr-v3-store.js";
 
+import type { ProjectConfig } from "../src/types.js";
 const options = {
   shimPort: 8787,
   localSecret: "local-secret",
   model: "glm-5.2",
   models: ["glm-5.2"],
   setDefault: true
+};
+
+const project: ProjectConfig = {
+  model: "glm-5.2",
+  models: ["glm-5.2"],
+  shimHost: "127.0.0.1",
+  shimPort: 8787,
+  localSecret: "local-secret",
+  proxy: "auto",
+  managedRoutes: true
 };
 
 test("v3 adapter reconciles SQLite and exposes the managed loopback key", async () => {
@@ -32,6 +44,7 @@ test("v3 adapter reconciles SQLite and exposes the managed loopback key", async 
     baseUrl: "http://127.0.0.1:3456",
     apiKey: "local-secret"
   });
+  await adapter.validateManagedState(project);
 });
 
 test("v3 adapter refuses to reconcile while the gateway is healthy", async () => {
@@ -101,4 +114,55 @@ test("v3 restart uses stop then start and health checks", async () => {
 
   assert.equal(await adapter.restart(), true);
   assert.deepEqual(calls, ["stop", "start"]);
+});
+test("v3 managed-state validation rejects a missing provider", async () => {
+  const home = await mkdtemp(join(tmpdir(), "cannbot-ccr-v3-invalid-"));
+  const paths = resolvePaths({ home, platform: "linux" });
+  const store = await openV3Store(paths);
+  await store.writeConfig({ Providers: [], Router: {
+    default: "cannbot,glm-5.2",
+    think: "cannbot,glm-5.2",
+    background: "cannbot,glm-5.2",
+    longContext: "cannbot,glm-5.2"
+  } });
+  await store.upsertManagedApiKey("local-secret");
+  await store.close();
+  const adapter = new CcrV3Adapter({
+    paths,
+    health: async () => false
+  });
+  await assert.rejects(() => adapter.validateManagedState(project), /provider/i);
+});
+
+test("v3 managed-state validation rejects missing routes and keys", async () => {
+  const home = await mkdtemp(join(tmpdir(), "cannbot-ccr-v3-state-"));
+  const paths = resolvePaths({ home, platform: "linux" });
+  const store = await openV3Store(paths);
+  const provider = {
+    name: "cannbot",
+    api_base_url: "http://127.0.0.1:8787/v1/chat/completions",
+    api_key: "local-secret",
+    models: ["glm-5.2"],
+    transformer: { use: ["openai"] }
+  };
+  await store.writeConfig({ Providers: [provider], Router: {} });
+  await store.upsertManagedApiKey("local-secret");
+  await store.close();
+  const adapter = new CcrV3Adapter({
+    paths,
+    health: async () => false
+  });
+  await assert.rejects(() => adapter.validateManagedState(project), /route/i);
+  const repaired = await openV3Store(paths);
+  await repaired.writeConfig({ Providers: [provider], Router: {
+    default: "cannbot,glm-5.2",
+    think: "cannbot,glm-5.2",
+    background: "cannbot,glm-5.2",
+    longContext: "cannbot,glm-5.2"
+  } });
+  await repaired.close();
+  const apiKeysDb = new DatabaseSync(paths.ccrV3ApiKeysDb);
+  apiKeysDb.prepare("DELETE FROM api_keys WHERE id = ?").run("cannbot-cc");
+  apiKeysDb.close();
+  await assert.rejects(() => adapter.validateManagedState(project), /API key/i);
 });

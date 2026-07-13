@@ -1,7 +1,11 @@
 import { request } from "node:http";
 
 import type { CcrAdapter, CcrConnection } from "./ccr-adapter.js";
-import { reconcileCcrConfig, type ReconcileOptions } from "./ccr-config.js";
+import {
+  reconcileCcrConfig,
+  validateManagedCcrConfig,
+  type ReconcileOptions
+} from "./ccr-config.js";
 import type { CcrVersionRunner } from "./ccr-version.js";
 import { runCaptured } from "./processes.js";
 import {
@@ -12,7 +16,7 @@ import {
   snapshotV3Databases,
   type V3Store
 } from "./ccr-v3-store.js";
-import type { ResolvedPaths } from "./types.js";
+import type { ProjectConfig, ResolvedPaths } from "./types.js";
 
 export interface CcrV3AdapterDependencies {
   health?: (baseUrl: string) => Promise<boolean>;
@@ -97,6 +101,26 @@ export class CcrV3Adapter implements CcrAdapter {
       throw error;
     } finally {
       await discardV3Snapshot(snapshot);
+    }
+  }
+
+  async validateManagedState(project: ProjectConfig): Promise<void> {
+    const store = await this.store();
+    try {
+      const [config, keys] = await Promise.all([store.readConfig(), store.readApiKeys()]);
+      validateManagedCcrConfig(config, {
+        shimPort: project.shimPort,
+        localSecret: project.localSecret,
+        model: project.model,
+        models: project.models,
+        setDefault: false
+      }, project.managedRoutes === true);
+      const managedKeys = keys.filter((key) => key.id === "cannbot-cc");
+      if (managedKeys.length !== 1 || managedKeys[0].key !== project.localSecret) {
+        throw new Error("CCR v3 managed API key is missing or invalid");
+      }
+    } finally {
+      await store.close();
     }
   }
 

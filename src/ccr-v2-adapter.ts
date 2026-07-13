@@ -1,8 +1,12 @@
-import { reconcileCcrConfig, type ReconcileOptions } from "./ccr-config.js";
+import {
+  reconcileCcrConfig,
+  validateManagedCcrConfig,
+  type ReconcileOptions
+} from "./ccr-config.js";
 import { ccrStatus, restartCcr, startCcr, stopCcr } from "./ccr-processes.js";
 import { readJsonFile, writeJsonAtomic } from "./file-store.js";
 import type { CcrAdapter, CcrConnection } from "./ccr-adapter.js";
-import type { ResolvedPaths } from "./types.js";
+import type { ProjectConfig, ResolvedPaths } from "./types.js";
 
 function readConnection(value: unknown): Omit<CcrConnection, "major"> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -34,6 +38,16 @@ export class CcrV2Adapter implements CcrAdapter {
   async reconcile(options: ReconcileOptions): Promise<void> {
     const input = await readJsonFile<unknown>(this.paths.ccrV2Config);
     await writeJsonAtomic(this.paths.ccrV2Config, reconcileCcrConfig(input, options));
+  }
+
+  async validateManagedState(project: ProjectConfig): Promise<void> {
+    validateManagedCcrConfig(await readJsonFile(this.paths.ccrV2Config), {
+      shimPort: project.shimPort,
+      localSecret: project.localSecret,
+      model: project.model,
+      models: project.models,
+      setDefault: false
+    }, project.managedRoutes === true);
   }
 
   status(): Promise<boolean> { return ccrStatus(); }

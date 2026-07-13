@@ -136,6 +136,7 @@ export async function initializeProject(
     shimPort: options.shimPort,
     localSecret: previous?.localSecret ?? (dependencies.secret ?? (() => randomBytes(32).toString("base64url")))(),
     proxy: options.proxy,
+    managedRoutes: options.setDefault || previous?.managedRoutes === true,
     ...(ccrBackup ? { ccrBackup } : {})
   };
   await ccrAdapter.reconcile({
@@ -160,7 +161,11 @@ async function reconcileProject(
     throw new Error(`Cannbot model is not available: ${config.model}`);
   }
   const ccrExists = ccrAdapter.major === 2 && await exists(paths.ccrV2Config);
-  const nextConfig: ProjectConfig = { ...config, models: [...models] };
+  const nextConfig: ProjectConfig = {
+    ...config,
+    models: [...models],
+    managedRoutes: config.managedRoutes === true || setDefault
+  };
   if (!nextConfig.ccrBackup && ccrExists) {
     nextConfig.ccrBackup = await backupOnce(paths.ccrV2Config);
   }
@@ -229,10 +234,13 @@ export function createDefaultDoctorDependencies(
   const adapter = resolveCcrAdapter(paths);
   return {
     nodeVersion: () => process.versions.node,
-    executable: (name) => checkExecutable(
-      name,
-      name === "ccr" ? ["version"] : ["--version"]
-    ),
+    executable: async (name) => {
+      if (name !== "ccr") return checkExecutable(name, ["--version"]);
+      try {
+        await detectCcrVersion();
+        return true;
+      } catch { return false; }
+    },
     ccrVersion: () => detectCcrVersion(),
     credentials: async () => { await readCredentials(paths); },
     ccrConfig: async () => {
@@ -245,8 +253,7 @@ export function createDefaultDoctorDependencies(
       if (source.includes(credentials.accessToken) || source.includes(credentials.virtualKey)) {
         throw new Error("Cannbot credentials leaked into generated configuration");
       }
-      const connection = await selected.loadConnection();
-      if (!connection.apiKey) throw new Error("CCR local API key is missing");
+      await selected.validateManagedState(project);
     },
     proxy: async () => {
       const config = await loadProjectConfig(paths);

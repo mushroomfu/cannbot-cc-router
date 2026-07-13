@@ -25,5 +25,6 @@ export interface ProjectConfig {
   shimPort: number;
   localSecret: string;
   proxy: ProxyMode;
+  managedRoutes?: boolean;
   ccrBackup?: string;
 }
