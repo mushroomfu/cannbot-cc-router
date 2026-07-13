@@ -1,4 +1,5 @@
 export interface CannbotCredentials {
+  accessToken: string;
   virtualKey: string;
 }
 

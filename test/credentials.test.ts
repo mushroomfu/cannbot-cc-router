@@ -16,29 +16,30 @@ async function temporaryHome(): Promise<string> {
   return mkdtemp(join(tmpdir(), "cannbot-cc-credentials-"));
 }
 
-test("reads the virtual key without a Cannbot session", async () => {
+test("reads OpenCode credentials without a Cannbot session", async () => {
   const paths = resolvePaths({ home: await temporaryHome(), platform: "linux" });
   await writeJson(paths.openCodeAuthCandidates[0], {
+    cannbot: { type: "oauth", access: "access-secret" },
     "cannbot-vk": { type: "api", key: "virtual-secret" }
   });
 
   assert.deepEqual(await readCredentials(paths), {
+    accessToken: "access-secret",
     virtualKey: "virtual-secret"
   });
 });
 
-test("ignores Cannbot OAuth access state", async () => {
+test("requires a non-empty Cannbot access token", async () => {
   for (const cannbot of [
     undefined,
-    { type: "oauth", access: "", refresh: "" },
-    { type: "oauth", access: "oauth-access", refresh: "refresh-secret" }
+    { type: "oauth", access: "", refresh: "" }
   ]) {
     const paths = resolvePaths({ home: await temporaryHome(), platform: "linux" });
     await writeJson(paths.openCodeAuthCandidates[0], {
       ...(cannbot === undefined ? {} : { cannbot }),
       "cannbot-vk": { type: "api", key: "virtual-secret" }
     });
-    assert.deepEqual(await readCredentials(paths), { virtualKey: "virtual-secret" });
+    await assert.rejects(readCredentials(paths), { code: "ACCESS_TOKEN_MISSING" });
   }
 });
 
@@ -47,10 +48,14 @@ test("supports the Windows OpenCode auth candidate", async () => {
   const appData = join(home, "AppData", "Roaming");
   const paths = resolvePaths({ home, platform: "win32", env: { APPDATA: appData } });
   await writeJson(paths.openCodeAuthCandidates.at(-1)!, {
+    cannbot: { type: "oauth", access: "access-secret" },
     "cannbot-vk": { key: "virtual-secret" }
   });
 
-  assert.deepEqual(await readCredentials(paths), { virtualKey: "virtual-secret" });
+  assert.deepEqual(await readCredentials(paths), {
+    accessToken: "access-secret",
+    virtualKey: "virtual-secret"
+  });
 });
 
 test("reports missing OpenCode authentication", async () => {
@@ -73,6 +78,9 @@ test("reports malformed OpenCode authentication without exposing content", async
 
 test("requires a non-empty virtual key", async () => {
   const paths = resolvePaths({ home: await temporaryHome(), platform: "linux" });
-  await writeJson(paths.openCodeAuthCandidates[0], { "cannbot-vk": { key: "" } });
+  await writeJson(paths.openCodeAuthCandidates[0], {
+    cannbot: { type: "oauth", access: "access-secret" },
+    "cannbot-vk": { key: "" }
+  });
   await assert.rejects(readCredentials(paths), { code: "VIRTUAL_KEY_MISSING" });
 });

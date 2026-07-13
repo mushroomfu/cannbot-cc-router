@@ -121,7 +121,7 @@ test("stopShim uses authenticated HTTP shutdown instead of killing a PID", async
     ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: "http://127.0.0.1:1/v1/chat/completions",
     proxyMode: "direct",
-    readCredentials: async () => ({ virtualKey: "key" }),
+    readCredentials: async () => ({ accessToken: "access", virtualKey: "key" }),
     refreshCredentials: async () => undefined
   });
   const address = await shim.listen();

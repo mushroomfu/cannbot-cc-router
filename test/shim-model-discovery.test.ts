@@ -33,7 +33,7 @@ test("serves the authenticated Cannbot model catalog with namespaced IDs", async
     ccrApiKey: "ccr-local-key",
     upstreamUrl: "http://127.0.0.1:1/v1/chat/completions",
     proxyMode: "direct",
-    readCredentials: async () => ({ virtualKey: "virtual" }),
+    readCredentials: async () => ({ accessToken: "access", virtualKey: "virtual" }),
     refreshCredentials: async () => undefined
   } as Parameters<typeof createShim>[0]);
   const address = await shim.listen();
@@ -57,7 +57,7 @@ test("does not disclose model IDs without the local token", async (t) => {
     ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: "http://127.0.0.1:1/v1/chat/completions",
     proxyMode: "direct",
-    readCredentials: async () => ({ virtualKey: "virtual" }),
+    readCredentials: async () => ({ accessToken: "access", virtualKey: "virtual" }),
     refreshCredentials: async () => undefined
   } as Parameters<typeof createShim>[0]);
   const address = await shim.listen();

@@ -5,6 +5,7 @@ import type { CannbotCredentials, ResolvedPaths } from "./types.js";
 export type CredentialsErrorCode =
   | "AUTH_MISSING"
   | "AUTH_INVALID"
+  | "ACCESS_TOKEN_MISSING"
   | "VIRTUAL_KEY_MISSING";
 
 export class CredentialsError extends Error {
@@ -74,6 +75,18 @@ export async function readCredentials(
     "AUTH_INVALID",
     "OpenCode authentication"
   );
+  const cannbotEntry = auth.cannbot;
+  const accessToken =
+    cannbotEntry && typeof cannbotEntry === "object"
+      ? (cannbotEntry as Record<string, unknown>).access
+      : undefined;
+  if (typeof accessToken !== "string" || accessToken.trim() === "") {
+    throw new CredentialsError(
+      "ACCESS_TOKEN_MISSING",
+      "Cannbot login access token is missing; run `cannbot connect`"
+    );
+  }
+
   const virtualKeyEntry = auth["cannbot-vk"];
   const virtualKey =
     virtualKeyEntry && typeof virtualKeyEntry === "object"
@@ -86,5 +99,5 @@ export async function readCredentials(
     );
   }
 
-  return { virtualKey };
+  return { accessToken, virtualKey };
 }

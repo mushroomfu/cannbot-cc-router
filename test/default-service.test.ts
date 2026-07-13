@@ -24,6 +24,7 @@ test("initializes secure project and managed CCR configuration", async () => {
   const home = await mkdtemp(join(tmpdir(), "cannbot-default-service-"));
   const paths = resolvePaths({ home, platform: "linux" });
   await writeJsonAtomic(paths.openCodeAuthCandidates[0], {
+    cannbot: { access: "access-secret" },
     "cannbot-vk": { key: "virtual-secret" }
   });
   await writeJsonAtomic(paths.ccrConfig, {
@@ -69,7 +70,7 @@ test("initializes secure project and managed CCR configuration", async () => {
   const storedProject = await readJsonFile<ProjectConfig>(paths.projectConfig);
   const storedCcr = await readJsonFile<Record<string, unknown>>(paths.ccrConfig);
   const combined = JSON.stringify({ storedProject, storedCcr });
-  assert.doesNotMatch(combined, /virtual-secret/);
+  assert.doesNotMatch(combined, /access-secret|virtual-secret/);
   assert.match(combined, /generated-local-secret/);
   assert.deepEqual((storedCcr.Providers as Array<{ name: string }>).map((provider) => provider.name), [
     "existing", "cannbot"
@@ -81,7 +82,10 @@ test("initializes secure project and managed CCR configuration", async () => {
 test("rejects an unavailable model before writing configuration", async () => {
   const home = await mkdtemp(join(tmpdir(), "cannbot-default-model-"));
   const paths = resolvePaths({ home, platform: "linux" });
-  await writeJsonAtomic(paths.openCodeAuthCandidates[0], { "cannbot-vk": { key: "key" } });
+  await writeJsonAtomic(paths.openCodeAuthCandidates[0], {
+    cannbot: { access: "access" },
+    "cannbot-vk": { key: "key" }
+  });
   await writeJsonAtomic(paths.ccrConfig, { Providers: [], Router: {} });
 
   await assert.rejects(initializeProject({
@@ -101,6 +105,7 @@ test("initializes a managed Cannbot provider in CCR v3 SQLite", async () => {
   const home = await mkdtemp(join(tmpdir(), "cannbot-default-v3-"));
   const paths = resolvePaths({ home, platform: "linux" });
   await writeJsonAtomic(paths.openCodeAuthCandidates[0], {
+    cannbot: { access: "access-secret" },
     "cannbot-vk": { key: "virtual-secret" }
   });
   const ccr = new CcrV3Adapter({

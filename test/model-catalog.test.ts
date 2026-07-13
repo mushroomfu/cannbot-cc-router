@@ -53,6 +53,7 @@ test("initialization persists all models and manages all Cannbot routes", async 
   const home = await mkdtemp(join(tmpdir(), "cannbot-model-catalog-"));
   const paths = resolvePaths({ home, platform: "linux" });
   await writeJsonAtomic(paths.openCodeAuthCandidates[0], {
+    cannbot: { access: "access-secret" },
     "cannbot-vk": { key: "virtual-secret" }
   });
   await writeJsonAtomic(paths.ccrConfig, {

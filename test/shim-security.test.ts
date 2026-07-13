@@ -52,9 +52,13 @@ test("rereads credentials for every independent request", async (t) => {
     ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
-    readCredentials: async () => ({
-      virtualKey: `virtual-${++reads}`
-    }),
+    readCredentials: async () => {
+      reads += 1;
+      return {
+        accessToken: `access-${reads}`,
+        virtualKey: `virtual-${reads}`
+      };
+    },
     refreshCredentials: async () => undefined
   });
   const address = await shim.listen();
