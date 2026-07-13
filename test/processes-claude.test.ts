@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 import type { ChildProcess, SpawnOptions } from "node:child_process";
 
 import * as processes from "../src/processes.js";
+import { apiKeyHelperCommand } from "../src/claude-launcher.js";
 import type { SpawnFunction } from "../src/processes.js";
 import type { ProjectConfig } from "../src/types.js";
 
@@ -22,7 +24,9 @@ test("launches Claude with temporary gateway discovery settings", async () => {
   let args: readonly string[] = [];
   let options: SpawnOptions | undefined;
   let settingsPath = "";
-  let settings: { env: Record<string, string> } | undefined;
+  let settings: { apiKeyHelper: string; env: Record<string, string> } | undefined;
+  let helperCommand = "";
+  let helperOutput = "";
   const spawn = ((receivedCommand, receivedArgs, receivedOptions) => {
     command = receivedCommand;
     args = receivedArgs;
@@ -30,8 +34,13 @@ test("launches Claude with temporary gateway discovery settings", async () => {
     const settingsIndex = receivedArgs.lastIndexOf("--settings");
     settingsPath = receivedArgs[settingsIndex + 1];
     settings = JSON.parse(readFileSync(settingsPath, "utf8")) as {
+      apiKeyHelper: string;
       env: Record<string, string>;
     };
+    helperCommand = settings.apiKeyHelper;
+    const match = /^"([^"]+)" "([^"]+)"$/.exec(helperCommand);
+    assert.ok(match);
+    helperOutput = execFileSync(match[1], [match[2]], { encoding: "utf8" }).trim();
     const child = new EventEmitter() as ChildProcess;
     Object.assign(child, { stdin: null, stdout: null, stderr: null, kill: () => true });
     queueMicrotask(() => child.emit("close", 0, null));
@@ -58,7 +67,9 @@ test("launches Claude with temporary gateway discovery settings", async () => {
   assert.equal(options?.shell, false);
   assert.equal(options?.stdio, "inherit");
   assert.equal(settings?.env.ANTHROPIC_BASE_URL, "http://127.0.0.1:8787");
-  assert.equal(settings?.env.ANTHROPIC_AUTH_TOKEN, "local-secret");
+  assert.equal(settings?.env.ANTHROPIC_AUTH_TOKEN, undefined);
+  assert.equal(helperOutput, "local-secret");
+  assert.match(helperCommand, /api-key-helper\.mjs/);
   assert.equal(settings?.env.CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY, "1");
   assert.equal(settings?.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC, "");
   assert.match(settings?.env.NO_PROXY ?? "", /internal\.example/);
@@ -66,6 +77,17 @@ test("launches Claude with temporary gateway discovery settings", async () => {
   assert.match(settings?.env.NO_PROXY ?? "", /127\.0\.0\.1/);
   assert.equal(existsSync(settingsPath), false);
   assert.equal(options?.env?.NODE_NO_WARNINGS, "1");
+});
+
+test("quotes API-key helper paths for Windows and POSIX launchers", async () => {
+  assert.equal(
+    apiKeyHelperCommand("C:\\Program Files\\node.exe", "C:\\Temp Dir\\api-key-helper.mjs"),
+    '"C:\\Program Files\\node.exe" "C:\\Temp Dir\\api-key-helper.mjs"'
+  );
+  assert.equal(
+    apiKeyHelperCommand("/opt/node bin/node", "/tmp/helper dir/api-key-helper.mjs"),
+    '"/opt/node bin/node" "/tmp/helper dir/api-key-helper.mjs"'
+  );
 });
 
 test("launches the selected Cannbot model with Claude's 1M context alias", async () => {

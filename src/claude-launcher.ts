@@ -28,6 +28,11 @@ const defaultSpawn: ClaudeSpawnFunction = (command, args, options) => {
   return nodeSpawn(resolved.command, [...resolved.prefixArgs, ...args], options);
 };
 
+export function apiKeyHelperCommand(nodePath: string, helperPath: string): string {
+  const quote = (value: string) => `"${value.replaceAll('"', '\\"')}"`;
+  return `${quote(nodePath)} ${quote(helperPath)}`;
+}
+
 function hasExplicitClaudeModel(args: readonly string[]): boolean {
   return args.some((arg) => arg === "--model" || arg === "-m" || arg.startsWith("--model="));
 }
@@ -61,6 +66,7 @@ export async function runClaudeCode(
 ): Promise<number> {
   const directory = await mkdtemp(join(tmpdir(), "cannbot-cc-"));
   const settingsPath = join(directory, "settings.json");
+  const helperPath = join(directory, "api-key-helper.mjs");
   const noProxy = mergeNoProxy([
     options.env?.NO_PROXY,
     options.env?.no_proxy,
@@ -70,9 +76,9 @@ export async function runClaudeCode(
   const oneMillionContext = options.contextWindow === "1m";
   const contextModel = `anthropic/cannbot/${config.model}[1m]`;
   const settings = {
+    apiKeyHelper: apiKeyHelperCommand(process.execPath, helperPath),
     env: {
       ANTHROPIC_BASE_URL: `http://127.0.0.1:${config.shimPort}`,
-      ANTHROPIC_AUTH_TOKEN: config.localSecret,
       CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY: "1",
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "",
       NO_PROXY: noProxy,
@@ -90,6 +96,11 @@ export async function runClaudeCode(
     : [...args];
 
   try {
+    await writeFile(
+      helperPath,
+      `process.stdout.write(${JSON.stringify(config.localSecret)});\n`,
+      { encoding: "utf8", mode: 0o600 }
+    );
     await writeFile(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, {
       encoding: "utf8",
       mode: 0o600
