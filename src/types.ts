@@ -11,6 +11,7 @@ export interface ResolvedPaths {
   ccrConfig: string;
   ccrV2Config: string;
   ccrV3ConfigDb: string;
+  ccrV3GatewayConfig: string;
   ccrV3ApiKeysDb: string;
   openCodeAuthCandidates: string[];
 }

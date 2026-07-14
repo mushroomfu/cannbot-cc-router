@@ -48,6 +48,7 @@ export function resolvePaths(options: ResolvePathOptions = {}): ResolvedPaths {
     ccrConfig: ccrV2Config,
     ccrV2Config,
     ccrV3ConfigDb: join(v3Dir, "config.sqlite"),
+    ccrV3GatewayConfig: join(v3Dir, "gateway.config.json"),
     ccrV3ApiKeysDb: join(v3UserData, "api-keys.sqlite"),
     openCodeAuthCandidates: unique(candidates)
   };

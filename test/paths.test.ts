@@ -12,6 +12,10 @@ test("resolves the CCR v3 Windows database layout", () => {
   });
   assert.equal(paths.ccrV3ConfigDb, join("D:\\AppData", "claude-code-router", "config.sqlite"));
   assert.equal(paths.ccrV3ApiKeysDb, join("D:\\AppData", "claude-code-router", "api-keys.sqlite"));
+  assert.equal(
+    (paths as unknown as Record<string, string>).ccrV3GatewayConfig,
+    join("D:\\AppData", "claude-code-router", "gateway.config.json")
+  );
 });
 
 test("resolves the CCR v3 Linux and macOS database layout", () => {
@@ -19,6 +23,10 @@ test("resolves the CCR v3 Linux and macOS database layout", () => {
     const paths = resolvePaths({ home, platform, env: {} });
     assert.equal(paths.ccrV3ConfigDb, join(home, ".claude-code-router", "config.sqlite"));
     assert.equal(paths.ccrV3ApiKeysDb, join(home, ".claude-code-router", "app-data", "api-keys.sqlite"));
+    assert.equal(
+      (paths as unknown as Record<string, string>).ccrV3GatewayConfig,
+      join(home, ".claude-code-router", "gateway.config.json")
+    );
   }
 });
 
@@ -34,4 +42,8 @@ test("honors CCR internal directory overrides", () => {
   });
   assert.equal(paths.ccrV3ConfigDb, join("/srv/ccr-home", ".claude-code-router", "config.sqlite"));
   assert.equal(paths.ccrV3ApiKeysDb, join("/srv/ccr-userdata", "api-keys.sqlite"));
+  assert.equal(
+    (paths as unknown as Record<string, string>).ccrV3GatewayConfig,
+    join("/srv/ccr-home/.claude-code-router", "gateway.config.json")
+  );
 });
