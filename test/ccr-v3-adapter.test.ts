@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -43,6 +43,15 @@ async function preparedAdapter(prefix: string) {
 
 test("v3 connection prefers the generated runtime gateway port", async () => {
   const { adapter, paths } = await preparedAdapter("cannbot-ccr-v3-runtime-");
+  const store = await openV3Store(paths);
+  const config = await store.readConfig();
+  await store.writeConfig({
+    ...config,
+    gateway: { port: 4568 },
+    PORT: 4569,
+    routerEndpoint: "http://localhost:4570"
+  });
+  await store.close();
   await writeFile(paths.ccrV3GatewayConfig, JSON.stringify({ port: 4567 }), "utf8");
   assert.equal((await adapter.loadConnection()).baseUrl, "http://127.0.0.1:4567");
 });
@@ -62,12 +71,46 @@ test("v3 connection supports persisted CCR port forms before first start", async
   }
 });
 
+test("v3 connection resolves conflicting persisted ports by CCR precedence", async () => {
+  const { adapter, paths } = await preparedAdapter("cannbot-ccr-v3-persisted-precedence-");
+  const store = await openV3Store(paths);
+  const config = await store.readConfig();
+  await store.writeConfig({
+    ...config,
+    gateway: { port: 4568 },
+    PORT: 4569,
+    routerEndpoint: "http://localhost:4570"
+  });
+  assert.equal((await adapter.loadConnection()).baseUrl, "http://127.0.0.1:4568");
+
+  await store.writeConfig({ ...config, PORT: 4569, routerEndpoint: "http://localhost:4570" });
+  assert.equal((await adapter.loadConnection()).baseUrl, "http://127.0.0.1:4569");
+
+  await store.writeConfig({ ...config, routerEndpoint: "http://localhost:4570" });
+  await store.close();
+  assert.equal((await adapter.loadConnection()).baseUrl, "http://127.0.0.1:4570");
+});
+
 test("v3 connection rejects malformed runtime gateway configuration", async () => {
   const { adapter, paths } = await preparedAdapter("cannbot-ccr-v3-bad-runtime-");
   await writeFile(paths.ccrV3GatewayConfig, "{broken", "utf8");
   await assert.rejects(() => adapter.loadConnection(), /runtime gateway configuration is invalid/);
 });
 
+
+test("v3 connection rejects invalid runtime gateway ports", async () => {
+  for (const port of [0, 65_536]) {
+    const { adapter, paths } = await preparedAdapter(`cannbot-ccr-v3-bad-runtime-port-${port}-`);
+    await writeFile(paths.ccrV3GatewayConfig, JSON.stringify({ port }), "utf8");
+    await assert.rejects(() => adapter.loadConnection(), /integer from 1 to 65535/);
+  }
+});
+
+test("v3 connection sanitizes unreadable runtime gateway configuration errors", async () => {
+  const { adapter, paths } = await preparedAdapter("cannbot-ccr-v3-unreadable-runtime-");
+  await mkdir(paths.ccrV3GatewayConfig);
+  await assert.rejects(() => adapter.loadConnection(), /Unable to read CCR v3 runtime gateway configuration/);
+});
 test("v3 connection rejects invalid persisted gateway ports", async () => {
   const { adapter, paths } = await preparedAdapter("cannbot-ccr-v3-bad-port-");
   const store = await openV3Store(paths);
@@ -144,6 +187,33 @@ test("v3 status polls a real loopback health endpoint", async (t) => {
 
   await adapter.start();
   assert.deepEqual(calls, []);
+});
+
+test("v3 start checks health at the runtime gateway port before persisted ports", async () => {
+  const { paths } = await preparedAdapter("cannbot-ccr-v3-start-runtime-");
+  const store = await openV3Store(paths);
+  const config = await store.readConfig();
+  await store.writeConfig({ ...config, gateway: { port: 4568 } });
+  await store.close();
+  await writeFile(paths.ccrV3GatewayConfig, JSON.stringify({ port: 4567 }), "utf8");
+
+  const healthUrls: string[] = [];
+  const commands: string[] = [];
+  const adapter = new CcrV3Adapter({
+    paths,
+    health: async (baseUrl) => {
+      healthUrls.push(baseUrl);
+      return true;
+    },
+    run: async (_command, args) => {
+      commands.push(args.join(" "));
+      return { code: 0, stdout: "", stderr: "" };
+    }
+  });
+
+  await adapter.start();
+  assert.deepEqual(healthUrls, ["http://127.0.0.1:4567"]);
+  assert.deepEqual(commands, []);
 });
 test("v3 restart uses stop then start and health checks", async () => {
   const home = await mkdtemp(join(tmpdir(), "cannbot-ccr-v3-restart-"));
