@@ -54,6 +54,6 @@ test("loads the CCR v3 SQLite connection for the shim", async () => {
   });
 
   const options = await loadShimOptions(paths.projectConfig, { ccr });
-  assert.equal(options.ccrUrl, "http://127.0.0.1:3456");
+  assert.equal(options.ccrUrl, "http://127.0.0.1:3457");
   assert.equal(options.ccrApiKey, "shim-local-secret");
 });

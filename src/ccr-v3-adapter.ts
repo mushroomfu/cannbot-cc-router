@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { request } from "node:http";
 
 import type { CcrAdapter, CcrConnection } from "./ccr-adapter.js";
@@ -27,14 +28,65 @@ export interface CcrV3AdapterDependencies {
   timeoutMs?: number;
 }
 
-function configuredPort(config: Record<string, unknown>): number {
-  const gateway = config.gateway;
-  if (!gateway || typeof gateway !== "object" || Array.isArray(gateway)) return 3456;
-  const port = (gateway as Record<string, unknown>).port ?? 3456;
-  if (!Number.isInteger(port) || (port as number) < 1 || (port as number) > 65_535) {
+const DEFAULT_CCR_V3_GATEWAY_PORT = 3457;
+
+function validPort(value: unknown): number | undefined {
+  if (value === undefined) return undefined;
+  if (!Number.isInteger(value) || (value as number) < 1 || (value as number) > 65_535) {
     throw new Error("CCR v3 gateway port must be an integer from 1 to 65535");
   }
-  return port as number;
+  return value as number;
+}
+
+function persistedGatewayPort(config: Record<string, unknown>): number {
+  const gateway = config.gateway;
+  if (gateway !== undefined && (!gateway || typeof gateway !== "object" || Array.isArray(gateway))) {
+    throw new Error("CCR v3 gateway configuration is invalid");
+  }
+  const nested = gateway as Record<string, unknown> | undefined;
+  const nestedPort = validPort(nested?.port);
+  if (nestedPort !== undefined) return nestedPort;
+  const topLevelPort = validPort(config.PORT);
+  if (topLevelPort !== undefined) return topLevelPort;
+  if (config.routerEndpoint !== undefined) {
+    if (typeof config.routerEndpoint !== "string") {
+      throw new Error("CCR v3 router endpoint is invalid");
+    }
+    let endpoint: URL;
+    try {
+      endpoint = new URL(config.routerEndpoint);
+    } catch {
+      throw new Error("CCR v3 router endpoint is invalid");
+    }
+    if (endpoint.port) return validPort(Number(endpoint.port)) as number;
+  }
+  return DEFAULT_CCR_V3_GATEWAY_PORT;
+}
+
+async function runtimeGatewayPort(path: string): Promise<number | undefined> {
+  let source: string;
+  try {
+    source = await readFile(path, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw new Error("Unable to read CCR v3 runtime gateway configuration");
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(source);
+  } catch {
+    throw new Error("CCR v3 runtime gateway configuration is invalid");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("CCR v3 runtime gateway configuration is invalid");
+  }
+  const port = validPort((parsed as Record<string, unknown>).port);
+  if (port === undefined) throw new Error("CCR v3 runtime gateway configuration is invalid");
+  return port;
+}
+
+async function configuredPort(paths: ResolvedPaths, config: Record<string, unknown>): Promise<number> {
+  return await runtimeGatewayPort(paths.ccrV3GatewayConfig) ?? persistedGatewayPort(config);
 }
 
 function directHealth(baseUrl: string): Promise<boolean> {
@@ -74,7 +126,7 @@ export class CcrV3Adapter implements CcrAdapter {
       if (!apiKey) throw new Error("CCR v3 Cannbot API key is missing; run `cannbot-cc sync`");
       return {
         major: this.major,
-        baseUrl: `http://127.0.0.1:${configuredPort(config as Record<string, unknown>)}`,
+        baseUrl: `http://127.0.0.1:${await configuredPort(this.dependencies.paths, config as Record<string, unknown>)}`,
         apiKey
       };
     } finally {
@@ -158,7 +210,10 @@ export class CcrV3Adapter implements CcrAdapter {
   private async loadBaseUrl(): Promise<string> {
     const store = await this.store();
     try {
-      return `http://127.0.0.1:${configuredPort(await store.readConfig() as Record<string, unknown>)}`;
+      return `http://127.0.0.1:${await configuredPort(
+        this.dependencies.paths,
+        await store.readConfig() as Record<string, unknown>
+      )}`;
     } finally {
       await store.close();
     }

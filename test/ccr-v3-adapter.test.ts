@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -29,6 +29,54 @@ const project: ProjectConfig = {
   managedRoutes: true
 };
 
+async function preparedAdapter(prefix: string) {
+  const home = await mkdtemp(join(tmpdir(), prefix));
+  const paths = resolvePaths({ home, platform: "linux" });
+  const adapter = new CcrV3Adapter({
+    paths,
+    run: async () => ({ code: 0, stdout: "", stderr: "" }),
+    health: async () => false
+  });
+  await adapter.reconcile(options);
+  return { adapter, paths };
+}
+
+test("v3 connection prefers the generated runtime gateway port", async () => {
+  const { adapter, paths } = await preparedAdapter("cannbot-ccr-v3-runtime-");
+  await writeFile(paths.ccrV3GatewayConfig, JSON.stringify({ port: 4567 }), "utf8");
+  assert.equal((await adapter.loadConnection()).baseUrl, "http://127.0.0.1:4567");
+});
+
+test("v3 connection supports persisted CCR port forms before first start", async () => {
+  for (const [field, value, expected] of [
+    ["gateway", { port: 4568 }, 4568],
+    ["PORT", 4569, 4569],
+    ["routerEndpoint", "http://localhost:4570", 4570]
+  ] as const) {
+    const { adapter, paths } = await preparedAdapter(`cannbot-ccr-v3-${field}-`);
+    const store = await openV3Store(paths);
+    const config = await store.readConfig();
+    await store.writeConfig({ ...config, [field]: value });
+    await store.close();
+    assert.equal((await adapter.loadConnection()).baseUrl, `http://127.0.0.1:${expected}`);
+  }
+});
+
+test("v3 connection rejects malformed runtime gateway configuration", async () => {
+  const { adapter, paths } = await preparedAdapter("cannbot-ccr-v3-bad-runtime-");
+  await writeFile(paths.ccrV3GatewayConfig, "{broken", "utf8");
+  await assert.rejects(() => adapter.loadConnection(), /runtime gateway configuration is invalid/);
+});
+
+test("v3 connection rejects invalid persisted gateway ports", async () => {
+  const { adapter, paths } = await preparedAdapter("cannbot-ccr-v3-bad-port-");
+  const store = await openV3Store(paths);
+  const config = await store.readConfig();
+  await store.writeConfig({ ...config, PORT: 0 });
+  await store.close();
+  await assert.rejects(() => adapter.loadConnection(), /integer from 1 to 65535/);
+});
+
 test("v3 adapter reconciles SQLite and exposes the managed loopback key", async () => {
   const home = await mkdtemp(join(tmpdir(), "cannbot-ccr-v3-adapter-"));
   const adapter = new CcrV3Adapter({
@@ -41,7 +89,7 @@ test("v3 adapter reconciles SQLite and exposes the managed loopback key", async 
 
   assert.deepEqual(await adapter.loadConnection(), {
     major: 3,
-    baseUrl: "http://127.0.0.1:3456",
+    baseUrl: "http://127.0.0.1:3457",
     apiKey: "local-secret"
   });
   await adapter.validateManagedState(project);
