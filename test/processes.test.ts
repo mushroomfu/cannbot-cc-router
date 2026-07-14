@@ -57,6 +57,7 @@ function paths(root: string): ResolvedPaths {
     ccrConfig: join(root, "ccr.json"),
     ccrV2Config: join(root, "ccr.json"),
     ccrV3ConfigDb: join(root, "config.sqlite"),
+    ccrV3GatewayConfig: join(root, "gateway.config.json"),
     ccrV3ApiKeysDb: join(root, "api-keys.sqlite"),
     openCodeAuthCandidates: [join(root, "auth.json")]
   };
