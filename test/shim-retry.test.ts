@@ -41,12 +41,16 @@ function post(port: number): Promise<{ status: number; body: string }> {
 }
 
 test("refreshes once and retries with newly read credentials", async (t) => {
-  const receivedCredentials: string[] = [];
+  const receivedHeaders: Array<{
+    authorization: string | undefined;
+    virtualKey: string | string[] | undefined;
+  }> = [];
   const upstream = createServer((incoming, response) => {
-    receivedCredentials.push(
-      `${incoming.headers.authorization}|${incoming.headers["x-api-vkey"]}`
-    );
-    if (receivedCredentials.length === 1) response.writeHead(401).end("expired");
+    receivedHeaders.push({
+      authorization: incoming.headers.authorization,
+      virtualKey: incoming.headers["x-api-vkey"]
+    });
+    if (receivedHeaders.length === 1) response.writeHead(401).end("expired");
     else response.writeHead(200).end("ok");
   });
   const upstreamPort = await listen(upstream);
@@ -60,13 +64,10 @@ test("refreshes once and retries with newly read credentials", async (t) => {
     ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
-    readCredentials: async () => {
-      credentialReads += 1;
-      return {
-        accessToken: `access-${credentialReads}`,
-        virtualKey: `virtual-${credentialReads}`
-      };
-    },
+    readCredentials: async () => ({
+      accessToken: `access-${credentialReads}`,
+      virtualKey: `virtual-${++credentialReads}`
+    }),
     refreshCredentials: async () => {
       refreshes += 1;
     }
@@ -76,23 +77,29 @@ test("refreshes once and retries with newly read credentials", async (t) => {
 
   assert.deepEqual(await post(address.port), { status: 200, body: "ok" });
   assert.equal(refreshes, 1);
-  assert.deepEqual(receivedCredentials, [
-    "Bearer access-1|virtual-1",
-    "Bearer access-2|virtual-2"
+  assert.deepEqual(receivedHeaders.map(({ authorization }) => authorization), [
+    "Bearer virtual-1",
+    "Bearer virtual-2"
   ]);
+  assert.deepEqual(receivedHeaders.map(({ virtualKey }) => virtualKey), [undefined, undefined]);
+  assert.doesNotMatch(JSON.stringify(receivedHeaders), /access-/);
 });
 
 test("shares one refresh across concurrent authentication failures", async (t) => {
   let credentialReads = 0;
   let refreshes = 0;
-  const receivedCredentials: string[] = [];
+  const receivedHeaders: Array<{
+    authorization: string | undefined;
+    virtualKey: string | string[] | undefined;
+  }> = [];
   let requests = 0;
   const upstream = createServer((incoming, response) => {
     requests += 1;
-    receivedCredentials.push(
-      `${incoming.headers.authorization}|${incoming.headers["x-api-vkey"]}`
-    );
-    if (receivedCredentials.length <= 2) response.writeHead(401).end();
+    receivedHeaders.push({
+      authorization: incoming.headers.authorization,
+      virtualKey: incoming.headers["x-api-vkey"]
+    });
+    if (receivedHeaders.length <= 2) response.writeHead(401).end();
     else response.writeHead(200).end("ok");
   });
   const upstreamPort = await listen(upstream);
@@ -104,13 +111,10 @@ test("shares one refresh across concurrent authentication failures", async (t) =
     ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
-    readCredentials: async () => {
-      credentialReads += 1;
-      return {
-        accessToken: `access-${credentialReads}`,
-        virtualKey: `virtual-${credentialReads}`
-      };
-    },
+    readCredentials: async () => ({
+      accessToken: `access-${credentialReads}`,
+      virtualKey: `virtual-${++credentialReads}`
+    }),
     refreshCredentials: async () => {
       refreshes += 1;
       await new Promise((resolve) => setTimeout(resolve, 25));
@@ -123,12 +127,14 @@ test("shares one refresh across concurrent authentication failures", async (t) =
   assert.deepEqual(results.map((result) => result.status), [200, 200]);
   assert.equal(refreshes, 1);
   assert.equal(requests, 4);
-  assert.deepEqual([...receivedCredentials].sort(), [
-    "Bearer access-1|virtual-1",
-    "Bearer access-2|virtual-2",
-    "Bearer access-3|virtual-3",
-    "Bearer access-4|virtual-4"
-  ].sort());
+  assert.deepEqual([...receivedHeaders.map(({ authorization }) => authorization)].sort(), [
+    "Bearer virtual-1",
+    "Bearer virtual-2",
+    "Bearer virtual-3",
+    "Bearer virtual-4"
+  ]);
+  assert.deepEqual(receivedHeaders.map(({ virtualKey }) => virtualKey), [undefined, undefined, undefined, undefined]);
+  assert.doesNotMatch(JSON.stringify(receivedHeaders), /access-/);
 });
 
 test("does not retry a second authentication failure", async (t) => {
