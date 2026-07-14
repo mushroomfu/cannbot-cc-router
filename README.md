@@ -156,6 +156,8 @@ An explicitly configured proxy failure is reported; the shim does not silently f
 | v3.0.x on Windows | `%APPDATA%\claude-code-router\config.sqlite` and `api-keys.sqlite` | `start` / `stop` plus gateway `/health` polling |
 | v3.0.x on Linux/macOS | `~/.claude-code-router/config.sqlite` and `~/.claude-code-router/app-data/api-keys.sqlite` | `start` / `stop` plus gateway `/health` polling |
 
+CCR v3 exposes separate web-management and inference gateway ports. `cannbot-cc` reads the generated `gateway.config.json` and sends shim traffic only to the loopback inference gateway. If CCR changes its runtime port, restart with `cannbot-cc restart` so the shim reloads it.
+
 Direct v3 `init` or `sync` refuses to write while the CCR gateway is running. Managed `start` and `restart` commands stop a running v3 service, synchronize while stopped, and then restore service health.
 
 Before its first managed v3 update, `cannbot-cc` stores a complete database backup under `~/.cannbot-cc-router/` and records the directory in `ccr-v3-backup.txt`. Each update also uses a short-lived rollback snapshot so a second-database failure restores the state from immediately before that operation.
