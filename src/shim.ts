@@ -59,11 +59,23 @@ const CCR_PATHS = new Set([
   "/v1/messages/count_tokens"
 ]);
 
-function secretsEqual(actual: string | undefined, expected: string): boolean {
-  if (!actual?.startsWith("Bearer ")) return false;
-  const provided = Buffer.from(actual.slice("Bearer ".length));
+function secretsEqual(actual: string | string[] | undefined, expected: string): boolean {
+  if (typeof actual !== "string") return false;
+  const provided = Buffer.from(actual);
   const wanted = Buffer.from(expected);
   return provided.length === wanted.length && timingSafeEqual(provided, wanted);
+}
+
+function localRequestIsAuthenticated(
+  headers: IncomingHttpHeaders,
+  expected: string
+): boolean {
+  const authorization = headers.authorization;
+  return (
+    typeof authorization === "string" &&
+    authorization.startsWith("Bearer ") &&
+    secretsEqual(authorization.slice("Bearer ".length), expected)
+  ) || secretsEqual(headers["x-api-key"], expected);
 }
 
 function collectBody(incoming: IncomingMessage, maximum: number): Promise<Buffer> {
@@ -258,7 +270,7 @@ export function createShim(options: ShimOptions): Shim {
     }
 
     if (incoming.method === "GET" && pathname === "/v1/models") {
-      if (!secretsEqual(incoming.headers.authorization, options.localSecret)) {
+      if (!localRequestIsAuthenticated(incoming.headers, options.localSecret)) {
         unauthorized(response);
         return;
       }
@@ -276,7 +288,7 @@ export function createShim(options: ShimOptions): Shim {
     }
 
     if (incoming.method === "POST" && pathname === "/shutdown") {
-      if (!secretsEqual(incoming.headers.authorization, options.localSecret)) {
+      if (!localRequestIsAuthenticated(incoming.headers, options.localSecret)) {
         response.writeHead(401).end();
         return;
       }
@@ -299,7 +311,7 @@ export function createShim(options: ShimOptions): Shim {
       response.writeHead(404).end();
       return;
     }
-    if (!secretsEqual(incoming.headers.authorization, options.localSecret)) {
+    if (!localRequestIsAuthenticated(incoming.headers, options.localSecret)) {
       unauthorized(response);
       return;
     }
