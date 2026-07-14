@@ -28,7 +28,7 @@ Add the CCR v3 generated gateway configuration path to `ResolvedPaths`:
 
 - Windows: `%APPDATA%/claude-code-router/gateway.config.json`
 - Linux/macOS: the existing CCR v3 configuration directory plus `gateway.config.json`
-- `CCR_INTERNAL_APP_DATA_DIR` continues to override the v3 directory consistently with the SQLite paths.
+- Existing internal-directory override behavior remains unchanged: the gateway file is located beside `config.sqlite` in the resolved CCR v3 configuration directory.
 
 ### Port resolution
 
