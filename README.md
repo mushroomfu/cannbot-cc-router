@@ -10,7 +10,9 @@ Claude Code
   -> Cannbot compatible-mode gateway
 ```
 
-The shim reads the current Cannbot credentials for every upstream request and uses the connected `cannbot-vk` as the compatible-provider Bearer credential. The Cannbot login access token is not forwarded to the model endpoint, and credentials are not copied into this project, CCR configuration, or Claude settings.
+The shim rereads the Cannbot login access token and connected `cannbot-vk` from OpenCode `auth.json` for every upstream request. To match Cannbot CLI 1.0.1, it sends the access token as the compatible-provider Bearer credential and `cannbot-vk` as `x-api-vkey`. The router does not read legacy `~/.cannbot/session.json`, and neither credential is copied into this project, CCR configuration, or Claude settings.
+
+Claude's `anthropic/cannbot/<model>` identifier is validated against the discovered catalog and forwarded to CCR as the plain model ID. CCR's managed route selects the Cannbot provider; the request body does not embed a legacy `provider,model` route string.
 
 ## Requirements
 
@@ -186,7 +188,7 @@ Claude gateway settings are written to a mode-0600 temporary file for the lifeti
 - The shim binds only to `127.0.0.1`.
 - Claude and CCR authenticate to the shim with a generated local bearer secret.
 - Shutdown requires both the bearer secret and the running shim's instance ID.
-- The shim rereads Cannbot credentials per request and sends only the current `cannbot-vk` as the upstream Bearer credential; the Cannbot login access token and `x-api-vkey` are not sent to the model endpoint.
+- The shim rereads the Cannbot login access token and `cannbot-vk` from OpenCode `auth.json` for each request, then sends `Authorization: Bearer <accessToken>` and `x-api-vkey: <virtualKey>` to the model endpoint. It does not read legacy `~/.cannbot/session.json`.
 - A 401/403 triggers one bounded Cannbot validation and one retry; it cannot loop indefinitely.
 - Internal errors returned to local clients omit secret-bearing details.
 - Confirm that your Cannbot subscription terms permit use from Claude Code.
