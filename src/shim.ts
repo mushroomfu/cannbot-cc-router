@@ -204,7 +204,7 @@ function rewriteClaudeModel(body: Buffer, models: readonly string[]): Buffer {
     if (!models.includes(model)) {
       throw new UnsupportedModelError("Unsupported Cannbot model");
     }
-    requestBody.model = `cannbot,${model}`;
+    requestBody.model = model;
   }
   return Buffer.from(JSON.stringify(requestBody));
 }

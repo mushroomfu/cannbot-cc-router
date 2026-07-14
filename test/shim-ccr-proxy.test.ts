@@ -113,7 +113,7 @@ test("rewrites a discovered model and proxies Anthropic JSON to CCR", async (t) 
   assert.notEqual(captured[0].headers.authorization, "Bearer local-secret");
   assert.doesNotMatch(JSON.stringify(captured[0]), /cannbot-access-secret|cannbot-virtual-secret/);
   assert.deepEqual(JSON.parse(captured[0].body), {
-    model: "cannbot,glm-5.2",
+    model: "glm-5.2",
     messages: [{ role: "user", content: "hello" }]
   });
 });
@@ -145,7 +145,7 @@ test("removes Claude's 1M context suffix before forwarding to CCR", async (t) =>
 
   assert.equal(result.status, 200);
   assert.deepEqual(JSON.parse(captured[0].body), {
-    model: "cannbot,glm-5.2",
+    model: "glm-5.2",
     messages: []
   });
 });
