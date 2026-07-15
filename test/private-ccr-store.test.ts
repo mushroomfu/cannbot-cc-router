@@ -231,21 +231,21 @@ test("seeds a fully private CCR 3.0.13 layout for only the Cannbot provider", as
   }
 });
 
-test("uses the 3.0.3 private legacy path and refuses pre-lifecycle CCR releases", async () => {
+test("allows only CCR 3.0.13 to seed a private lifecycle store", async () => {
   const session = await createPrivateCcrEnvironment({ parentEnv: { PATH: "private-path" } });
   try {
     const { seedPrivateCcrStore } = await loadPrivateCcrStore();
-    for (const patch of [0, 1, 2]) {
+    for (const patch of [...Array(13).keys(), 14]) {
       await assert.rejects(
         () => seedPrivateCcrStore(seedOptions(session.paths, `3.0.${patch}`)),
-        /private.*3\.0\.[0-2]|3\.0\.[0-2].*private/i
+        /private CCR lifecycle requires CCR 3\.0\.13/i
       );
     }
     assert.equal(await exists(join(session.paths.appData, "Claude Code Router", "config.sqlite")), false);
     assert.equal(await exists(join(session.paths.appData, "claude-code-router", "config.sqlite")), false);
 
-    const layout = await seedPrivateCcrStore(seedOptions(session.paths, "3.0.3"));
-    assert.equal(layout.configDir, join(session.paths.appData, "Claude Code Router"));
+    const layout = await seedPrivateCcrStore(seedOptions(session.paths, "3.0.13"));
+    assert.equal(layout.configDir, join(session.paths.appData, "claude-code-router"));
     assert.equal(await exists(layout.configDb), true);
     assert.equal(await exists(layout.apiKeysDb), true);
   } finally {

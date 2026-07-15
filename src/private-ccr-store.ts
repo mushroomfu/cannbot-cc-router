@@ -43,18 +43,10 @@ interface ColumnInfo {
 }
 
 function supportedPrivatePatch(version: DetectedCcrVersion): number {
-  const match = /^3\.0\.(0|[1-9]\d*)$/.exec(version.version);
-  if (version.major !== 3 || !match) {
-    throw new Error("Private CCR layout requires a supported CCR 3.0.x release");
+  if (version.major !== 3 || version.version !== "3.0.13") {
+    throw new Error("Private CCR lifecycle requires CCR 3.0.13");
   }
-  const patch = Number(match[1]);
-  if (patch > 13) {
-    throw new Error("Private CCR layout supports CCR 3.0.0 through 3.0.13");
-  }
-  if (patch < 3) {
-    throw new Error(`CCR ${version.version} cannot use a private layout because it has no public private lifecycle`);
-  }
-  return patch;
+  return 13;
 }
 
 function assertInside(root: string, candidate: string): void {
@@ -235,10 +227,10 @@ function privateConfig(
 export function resolvePrivateCcrLayout(
   options: ResolvePrivateCcrLayoutOptions
 ): PrivateCcrStoreLayout {
-  const patch = supportedPrivatePatch(options.version);
+  supportedPrivatePatch(options.version);
   const platform = options.platform ?? process.platform;
   const configDir = platform === "win32"
-    ? join(options.paths.appData, patch === 3 ? "Claude Code Router" : "claude-code-router")
+    ? join(options.paths.appData, "claude-code-router")
     : join(options.paths.home, ".claude-code-router");
   const layout: PrivateCcrStoreLayout = {
     apiKeysDb: join(options.paths.userData, "api-keys.sqlite"),
