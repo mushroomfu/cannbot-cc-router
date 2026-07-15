@@ -134,3 +134,16 @@ Local static/runtime evidence for CCR `3.0.3` only:
 - **Working location:** The user explicitly selected the current checkout and branch for implementation. The earlier worktree gate is superseded for this run; do not reset, clean, switch branches, or touch the untracked nested `cannbot-cc-router/` directory.
 - **Artifact boundary discovered:** `3.0.0` through `3.0.2` have no public private-gateway start/stop CLI. They must not silently use shared state; their only allowed route is the explicit user-supplied external endpoint mode unless later artifact evidence establishes a safe private lifecycle.
 - **Current implementation state:** strict release detection and a child-only private environment are in progress. No real model request is authorized.
+
+## Implementation ledger (2026-07-15)
+
+Completed on the authorized current branch:
+
+1. Strict CCR parsing accepts only canonical `3.0.0` through `3.0.13`; version fallback executes the resolved artifact with the private child environment.
+2. A child-only private environment uses an owned temporary root, overrides all CCR storage roots and `TMPDIR`, omits unrelated parent variables including `CODEX_HOME`, and preserves the primary setup failure even if cleanup also fails.
+3. The private store now has red/green tests for the `3.0.3` and `3.0.13` Windows layouts, exact SQLite schemas, only-Cannbot configuration, disabled non-Claude integrations, no WAL sidecars, distinct ports, and distinct gateway/shim credentials. `3.0.0` through `3.0.2` reject private layout construction before any DB write.
+
+Next implementation boundary:
+
+- Create a private-session lifecycle with owned dynamic loopback ports, no captured CCR control output, same-environment `start`/`stop`, gateway readiness checks, and cleanup restricted to the session root. Do not integrate it with the old router/CLI chain until those lifecycle tests pass.
+- Then replace the launcher/service surface and delete the legacy shared-state modules. No real model request is authorized during these steps.

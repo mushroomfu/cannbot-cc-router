@@ -286,3 +286,12 @@
 > Official-source audit found that releases `3.0.0` through `3.0.2` expose only the profile-launch CLI and have no public `start`/`stop` private-gateway lifecycle. Releases `3.0.3` and later expose the lifecycle and child-path controls under investigation. Private mode for every release remains unverified until the artifact matrix passes; a version without a safe private layout must require the user-supplied external endpoint mode and must never use shared CCR state.
 >
 > Until matrix evidence exists, version acceptance means only that the artifact falls within the reviewed release range. It is not a claim that private startup has passed for that artifact.
+
+## 13. Private-store implementation ledger (2026-07-15)
+
+- Private-start eligibility is intentionally narrower than release acceptance: `3.0.3` through `3.0.13` have the observed public lifecycle and child path controls. `3.0.0` through `3.0.2` are accepted only for a future explicit external-endpoint mode; they must fail private-start preparation without creating a database or consulting shared CCR state.
+- The private layout is derived only from the session root: Windows `3.0.3` uses `<private APPDATA>/Claude Code Router`; Windows `3.0.4` through `3.0.13` use `<private APPDATA>/claude-code-router`; all use `<private user-data>/api-keys.sqlite`. The generated gateway config path is also below that same private config directory.
+- The session seed creates only `app_config` and `api_keys` with the artifact-audited schema. It does not copy, back up, migrate, open, or set WAL mode on a user database.
+- The private config writes exactly one loopback Cannbot provider, keeps the gateway credential only in the private API-key database, and uses a distinct CCR-to-shim credential in the provider. It explicitly disables profiles, the Codex profile/rule, proxy/system-proxy/browser capture, bot integration, login auto-start, observability, and tool hub.
+- Port ownership is not inferred from an existing listener: gateway, core, and shim ports must be distinct. The private gateway credential must differ from the shim credential. Both checks occur before filesystem writes.
+- Current evidence is unit-level only: private environment/version/store contracts pass locally. It is not a claim that any CCR artifact has passed a private-start or model-traffic test. Real artifact matrix and real-model smoke authorization remain separate gates.
