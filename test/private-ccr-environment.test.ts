@@ -34,6 +34,7 @@ test("private CCR environment is child-only, fully contained, and disposable", a
     SOME_UNRELATED_SECRET: "must-not-leak",
     TEMP: "shared-temp",
     TMP: "shared-tmp",
+    TMPDIR: "shared-tmpdir",
     USERPROFILE: "shared-user-profile"
   };
   const before = { ...parentEnv };
@@ -50,6 +51,7 @@ test("private CCR environment is child-only, fully contained, and disposable", a
     assert.equal(session.env.LOCALAPPDATA, session.paths.appData);
     assert.equal(session.env.TEMP, session.paths.temp);
     assert.equal(session.env.TMP, session.paths.temp);
+    assert.equal(session.env.TMPDIR, session.paths.temp);
     assert.equal(session.env.XDG_CONFIG_HOME, session.paths.xdgConfig);
     assert.equal(session.env.XDG_DATA_HOME, session.paths.xdgData);
     assert.equal(session.env.CCR_INTERNAL_HOME_DIR, session.paths.home);
@@ -67,4 +69,37 @@ test("private CCR environment is child-only, fully contained, and disposable", a
   assert.equal(await exists(session.paths.root), false);
   await session.dispose();
   assert.equal(await exists(session.paths.root), false);
+});
+
+test("preserves the initialization failure when cleanup fails", async () => {
+  let cleanupAttempted = false;
+  let session: Awaited<ReturnType<typeof createPrivateCcrEnvironment>> | undefined;
+
+  try {
+    session = await createPrivateCcrEnvironment({
+      dependencies: {
+        filesystem: {
+          chmod: async () => undefined,
+          mkdir: async () => {
+            throw new Error("directory creation failed");
+          },
+          mkdtemp: async () => "C:\\private-ccr",
+          rm: async () => {
+            cleanupAttempted = true;
+            throw new Error("cleanup failed");
+          }
+        },
+        platform: "linux",
+        temporaryDirectory: () => "C:\\tmp"
+      }
+    });
+
+    assert.fail("expected initialization to fail");
+  } catch (error) {
+    assert.match(error instanceof Error ? error.message : String(error), /directory creation failed/);
+  } finally {
+    await session?.dispose();
+  }
+
+  assert.equal(cleanupAttempted, true);
 });

@@ -82,3 +82,30 @@ test("rejects package metadata owned by a different package", async () => {
     run: async () => ({ code: 1, stdout: "", stderr: "" })
   }), /unable to determine/i);
 });
+
+test("rejects non-canonical CCR version identifiers", () => {
+  for (const version of ["03.0.13", "3.00.13", "3.0.013"]) {
+    assert.throws(() => parseSupportedCcrVersion(version), /supported|unable/i);
+  }
+});
+
+test("version fallback runs the resolved private artifact with its child environment", async () => {
+  const env: NodeJS.ProcessEnv = { PATH: "private-path" };
+  const detected = await detectCcrVersion({
+    env,
+    resolve: async () => ({ command: "private-ccr", prefixArgs: ["private-entry"] }),
+    run: async (command, args, options) => {
+      assert.equal(command, "private-ccr");
+      assert.deepEqual(args, ["private-entry", "version"]);
+      assert.equal(options.env, env);
+      assert.equal(options.timeoutMs, 10_000);
+      return {
+        code: 0,
+        stdout: "claude-code-router version: 3.0.13",
+        stderr: ""
+      };
+    }
+  });
+
+  assert.deepEqual(detected, { major: 3, version: "3.0.13" });
+});

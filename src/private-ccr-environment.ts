@@ -18,8 +18,25 @@ export interface PrivateCcrEnvironment {
   dispose(): Promise<void>;
 }
 
+export interface PrivateCcrFilesystem {
+  chmod(path: string, mode: number): Promise<void>;
+  mkdir(
+    path: string,
+    options: { mode: number; recursive: true }
+  ): Promise<string | undefined>;
+  mkdtemp(prefix: string): Promise<string>;
+  rm(path: string, options: { force: true; recursive: true }): Promise<void>;
+}
+
+export interface PrivateCcrEnvironmentDependencies {
+  readonly filesystem?: Partial<PrivateCcrFilesystem>;
+  readonly platform?: NodeJS.Platform;
+  readonly temporaryDirectory?: () => string;
+}
+
 export interface CreatePrivateCcrEnvironmentOptions {
   parentEnv?: Readonly<NodeJS.ProcessEnv>;
+  dependencies?: PrivateCcrEnvironmentDependencies;
 }
 
 const INHERITED_ENVIRONMENT_KEYS = [
@@ -43,6 +60,13 @@ const INHERITED_ENVIRONMENT_KEYS = [
   "no_proxy"
 ] as const;
 
+const DEFAULT_FILESYSTEM: PrivateCcrFilesystem = {
+  chmod: async (path, mode) => chmod(path, mode),
+  mkdir: async (path, options) => mkdir(path, options),
+  mkdtemp: async (prefix) => mkdtemp(prefix),
+  rm: async (path, options) => rm(path, options)
+};
+
 function inheritedEnvironment(parentEnv: Readonly<NodeJS.ProcessEnv>): NodeJS.ProcessEnv {
   const result: NodeJS.ProcessEnv = {};
   for (const key of INHERITED_ENVIRONMENT_KEYS) {
@@ -52,10 +76,14 @@ function inheritedEnvironment(parentEnv: Readonly<NodeJS.ProcessEnv>): NodeJS.Pr
   return result;
 }
 
-async function restrictDirectory(path: string): Promise<void> {
-  if (process.platform === "win32") return;
+async function restrictDirectory(
+  path: string,
+  filesystem: PrivateCcrFilesystem,
+  platform: NodeJS.Platform
+): Promise<void> {
+  if (platform === "win32") return;
   try {
-    await chmod(path, 0o700);
+    await filesystem.chmod(path, 0o700);
   } catch {
     // Some filesystems do not support POSIX permissions.
   }
@@ -64,7 +92,10 @@ async function restrictDirectory(path: string): Promise<void> {
 export async function createPrivateCcrEnvironment(
   options: CreatePrivateCcrEnvironmentOptions = {}
 ): Promise<PrivateCcrEnvironment> {
-  const root = await mkdtemp(join(tmpdir(), "cannbot-cc-ccr-"));
+  const filesystem: PrivateCcrFilesystem = { ...DEFAULT_FILESYSTEM, ...options.dependencies?.filesystem };
+  const platform = options.dependencies?.platform ?? process.platform;
+  const temporaryDirectory = options.dependencies?.temporaryDirectory ?? tmpdir;
+  const root = await filesystem.mkdtemp(join(temporaryDirectory(), "cannbot-cc-ccr-"));
   const paths: PrivateCcrPaths = {
     appData: join(root, "app-data"),
     home: join(root, "home"),
@@ -76,15 +107,18 @@ export async function createPrivateCcrEnvironment(
   };
 
   try {
-    await restrictDirectory(root);
-    await Promise.all(Object.values(paths)
-      .filter((path) => path !== root)
-      .map(async (path) => {
-        await mkdir(path, { mode: 0o700, recursive: true });
-        await restrictDirectory(path);
-      }));
+    await restrictDirectory(root, filesystem, platform);
+    for (const path of Object.values(paths)) {
+      if (path === root) continue;
+      await filesystem.mkdir(path, { mode: 0o700, recursive: true });
+      await restrictDirectory(path, filesystem, platform);
+    }
   } catch (error) {
-    await rm(root, { force: true, recursive: true });
+    try {
+      await filesystem.rm(root, { force: true, recursive: true });
+    } catch {
+      // Preserve the initialization error even when best-effort cleanup also fails.
+    }
     throw error;
   }
 
@@ -98,6 +132,7 @@ export async function createPrivateCcrEnvironment(
     LOCALAPPDATA: paths.appData,
     TEMP: paths.temp,
     TMP: paths.temp,
+    TMPDIR: paths.temp,
     USERPROFILE: paths.home,
     XDG_CONFIG_HOME: paths.xdgConfig,
     XDG_DATA_HOME: paths.xdgData
@@ -108,7 +143,7 @@ export async function createPrivateCcrEnvironment(
     env,
     paths,
     dispose: () => {
-      disposal ??= rm(root, { force: true, recursive: true });
+      disposal ??= filesystem.rm(root, { force: true, recursive: true });
       return disposal;
     }
   };

@@ -24,7 +24,7 @@ export interface DetectCcrVersionDependencies {
 }
 
 const VERSION_OUTPUT = /\b(?:claude-code-router\s+)?version\s*:\s*v?(\d+\.\d+\.\d+)\b/i;
-const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
+const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 const PACKAGE_NAME = "@musistudio/claude-code-router";
 
 export function parseSupportedCcrVersion(version: string): DetectedCcrVersion {
@@ -77,7 +77,11 @@ export async function detectCcrVersion(
   const packageVersion = packageVersionFromEntry(resolved.entry ?? resolved.prefixArgs[0]);
   if (packageVersion) return parseSupportedCcrVersion(packageVersion);
 
-  const result = await runner("ccr", ["version"], { timeoutMs: 10_000 });
+  const result = await runner(
+    resolved.command,
+    [...resolved.prefixArgs, "version"],
+    { env: dependencies.env, timeoutMs: 10_000 }
+  );
   if (result.code !== 0) {
     throw new Error("Unable to determine CCR version from the installed package or `ccr version`");
   }
