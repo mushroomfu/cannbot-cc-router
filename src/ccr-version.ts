@@ -32,9 +32,11 @@ export function parseSupportedCcrVersion(version: string): DetectedCcrVersion {
   if (!match) throw new Error("Unable to determine CCR version");
   const major = Number(match[1]);
   const minor = Number(match[2]);
-  if (major === 2) return { major, version };
-  if (major === 3 && minor === 0) return { major, version };
-  throw new Error(`Unsupported CCR version ${version}; supported versions are CCR v2 and 3.0.x`);
+  const patch = Number(match[3]);
+  if (major === 3 && minor === 0 && patch >= 0 && patch <= 13) {
+    return { major, version };
+  }
+  throw new Error(`Unsupported CCR version ${version}; supported versions are CCR 3.0.0 through 3.0.13`);
 }
 
 export function parseCcrVersion(output: string): CcrMajorVersion {
