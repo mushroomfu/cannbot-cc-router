@@ -10,6 +10,7 @@ export interface PrivateCcrStoreLayout {
   readonly configDb: string;
   readonly configDir: string;
   readonly gatewayConfigFile: string;
+  readonly serviceStateFile: string;
 }
 
 export interface ResolvePrivateCcrLayoutOptions {
@@ -243,7 +244,8 @@ export function resolvePrivateCcrLayout(
     apiKeysDb: join(options.paths.userData, "api-keys.sqlite"),
     configDb: join(configDir, "config.sqlite"),
     configDir,
-    gatewayConfigFile: join(configDir, "gateway.config.json")
+    gatewayConfigFile: join(configDir, "gateway.config.json"),
+    serviceStateFile: join(configDir, "service.json")
   };
   assertPrivateLayout(options.paths, layout);
   return layout;

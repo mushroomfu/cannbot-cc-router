@@ -15,6 +15,7 @@ interface PrivateCcrStoreLayout {
   readonly configDb: string;
   readonly configDir: string;
   readonly gatewayConfigFile: string;
+  readonly serviceStateFile: string;
 }
 
 interface SeedPrivateCcrStoreOptions {
@@ -105,6 +106,7 @@ test("seeds a fully private CCR 3.0.13 layout for only the Cannbot provider", as
     assert.equal(layout.configDb, join(layout.configDir, "config.sqlite"));
     assert.equal(layout.apiKeysDb, join(session.paths.userData, "api-keys.sqlite"));
     assert.equal(layout.gatewayConfigFile, join(layout.configDir, "gateway.config.json"));
+    assert.equal(layout.serviceStateFile, join(layout.configDir, "service.json"));
     for (const path of Object.values(layout)) assertInside(session.paths.root, path);
     assert.equal(await exists(layout.configDb), true);
     assert.equal(await exists(layout.apiKeysDb), true);
