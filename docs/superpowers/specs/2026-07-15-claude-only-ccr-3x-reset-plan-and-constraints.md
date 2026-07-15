@@ -148,6 +148,17 @@
 
 用户或外部工具负责准备 CCR endpoint 和认证信息；本项目把 CCR 当作不透明外部服务，只生成临时 Claude 会话配置并执行 `claude`。
 
+## 14. Lifecycle safety correction (2026-07-15)
+
+This section supersedes every earlier statement that treats CCR `3.0.3` through `3.0.13` as equally eligible for an owned private lifecycle.
+
+- The official release page currently identifies `v3.0.13` as the latest release. It is the only release eligible for automatic private lifecycle work in this branch until a separate source-and-artifact audit expands the set.
+- CCR `3.0.0` through `3.0.7` must never enter automatic private start/stop: their stop behavior can terminate the PID recorded in state without proving process identity. CCR `3.0.8` through `3.0.12` remain unverified and are also rejected before private database creation or control commands.
+- Version parsing may recognize the reviewed `3.0.0` through `3.0.13` range for diagnostics. Recognition is not private-lifecycle eligibility and does not permit a shared-state fallback.
+- A v3.0.13 session may call `ccr stop` only after its own post-start `service.json` proof has been parsed without logging it: a non-empty service token, positive PID, loopback Web URL on the session's allocated Web port, and Web-auth token are required. The recorded PID, token, and URL must match again immediately before stop; an authenticated `getServiceIdentity` RPC must confirm the same token and PID.
+- If the proof is absent, malformed, changed, or not authenticated, the session must not invoke `ccr stop`, signal a PID, or kill a port. It fails closed. A detached-start timeout with no proof is an upstream cleanup limitation: retain the isolated root rather than deleting it while an unproven child might still use it, and report only a redacted ownership-cleanup failure.
+- Gateway readiness remains a separate loopback check on the configured gateway port; the Web-management port and ownership RPC do not prove gateway readiness. No model request is permitted.
+
 优点：
 
 - 产品边界最窄，最符合“只负责拉起 Claude”。

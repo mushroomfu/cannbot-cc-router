@@ -147,3 +147,13 @@ Next implementation boundary:
 
 - Create a private-session lifecycle with owned dynamic loopback ports, no captured CCR control output, same-environment `start`/`stop`, gateway readiness checks, and cleanup restricted to the session root. Do not integrate it with the old router/CLI chain until those lifecycle tests pass.
 - Then replace the launcher/service surface and delete the legacy shared-state modules. No real model request is authorized during these steps.
+
+## Safety correction: token-bound private lifecycle (2026-07-15)
+
+This correction supersedes conflicting earlier version-range and cleanup wording in this plan.
+
+1. The current official latest release is `v3.0.13`; automatic private lifecycle is limited to that exact release for this implementation. `3.0.0` through `3.0.7` are unsafe because their stop implementation can signal an unverified PID. `3.0.8` through `3.0.12` are not yet source-and-artifact verified, so they must reject private mode before database or control-process work.
+2. Session startup must use `ccr start --host 127.0.0.1 --port <private-web-port> --no-open` with the exact private child environment and discarded control output. It must record only in memory a post-start state proof: PID, service token, and loopback Web URL. Secrets and state values must never be logged.
+3. Before same-environment `ccr stop`, re-read and compare that proof, require the original allocated loopback Web port, and verify it with the v3.0.13 authenticated `getServiceIdentity` RPC. The v3.0.13 stop path then uses authenticated `quitApp`, not a PID signal.
+4. On a state/token/identity mismatch, never stop by PID, process name, or port. In the ambiguous detached-start timeout branch, retain the private root instead of deleting data that an unproven child might still use; return a redacted failure. This exception is required to preserve the non-interference constraint and must be artifact-tested.
+5. The session API remains two-stage: prepare the private environment, three ports, and in-memory gateway connection; bind the current-process shim; then seed the store and start CCR with the shim's actual port. Gateway readiness checks the configured gateway port, not the Web-management port.
