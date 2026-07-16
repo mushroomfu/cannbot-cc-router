@@ -75,6 +75,7 @@ test("authenticates locally and injects the Cannbot virtual key as Bearer auth",
     localSecret: "local-secret",
     models: ["glm-5.2"],
     ccrUrl: "http://127.0.0.1:3456",
+    ccrApiKey: "ccr-test-key",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
     readCredentials: async () => ({
@@ -114,6 +115,7 @@ test("rejects an incorrect local secret without contacting upstream", async (t) 
   const shim = createShim({
     localSecret: "local-secret",
     models: ["glm-5.2"],
+    ccrApiKey: "ccr-test-key",
     ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",

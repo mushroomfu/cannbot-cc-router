@@ -157,3 +157,56 @@ This correction supersedes conflicting earlier version-range and cleanup wording
 3. Before same-environment `ccr stop`, re-read and compare that proof, require the original allocated loopback Web port, and verify it with the v3.0.13 authenticated `getServiceIdentity` RPC. The v3.0.13 stop path then uses authenticated `quitApp`, not a PID signal.
 4. On a state/token/identity mismatch, never stop by PID, process name, or port. In the ambiguous detached-start timeout branch, retain the private root instead of deleting data that an unproven child might still use; return a redacted failure. This exception is required to preserve the non-interference constraint and must be artifact-tested.
 5. The session API remains two-stage: prepare the private environment, three ports, and in-memory gateway connection; bind the current-process shim; then seed the store and start CCR with the shim's actual port. Gateway readiness checks the configured gateway port, not the Web-management port.
+
+## Approved execution revision (2026-07-16)
+
+The user approved inline execution on the current branch. This revision supersedes the earlier worktree gate and broad runtime matrix.
+
+### Deliverable 1: Make the gateway credential an invariant
+
+**Files:** Modify `src/shim.ts`; test `test/shim-ccr-proxy.test.ts` and `test/shim-main-options.test.ts`.
+
+- [ ] Add a test that creates a shim without `ccrApiKey` and expects construction to fail before it listens.
+- [ ] Run the focused test and record the expected red result caused by the optional key and `test` fallback.
+- [ ] Make `ShimOptions.ccrApiKey` required, reject blank values synchronously, and always set `x-api-key` to the explicit value.
+- [ ] Run the focused shim suite and commit the invariant.
+
+### Deliverable 2: Isolate the Claude child from native Claude
+
+**Files:** Modify `src/claude-launcher.ts`; test `test/processes-claude.test.ts`.
+
+- [ ] Add tests with native home/config paths, Anthropic endpoint/key variables, and `CODEX_HOME` sentinels.
+- [ ] Assert Cannbot Claude receives a private session root for every state-bearing path, no native Anthropic/API or Codex variable, and still resolves the real `claude` command through an allowlisted executable environment.
+- [ ] Assert settings/helper paths are inside that private root and removed after success and spawn failure; native sentinels remain unchanged.
+- [ ] Run focused launcher tests red, implement an explicit child-environment builder, then run them green.
+
+### Deliverable 3: Implement the owned CCR 3.0.13 lifecycle
+
+**Files:** Create `src/private-ccr-session.ts`; test `test/private-ccr-session.test.ts`; reuse private environment, store, and version modules.
+
+- [ ] Write lifecycle tests for distinct dynamic loopback ports, exact `3.0.13` admission, private seeding, discarded control output, service-proof parsing, authenticated identity verification, gateway readiness, and idempotent disposal.
+- [ ] Add failure tests for missing or changed proof, readiness timeout, failed Claude launch, and cleanup failure. No path may signal a PID or stop a process without token-bound proof; an unproven detached start retains its root.
+- [ ] Observe tests fail because the session module is absent, implement the smallest state machine, then run environment/store/session tests together.
+
+### Deliverable 4: Replace the legacy `code` path with one private session
+
+**Files:** Modify `src/default-service.ts`, `src/router-service.ts`, `src/cli.ts`, and related tests.
+
+- [ ] Add an orchestration test for model loading, credential validation, exact CCR detection, private environment and secrets, current-process shim, private CCR, direct Claude, and reverse-order disposal.
+- [ ] Add a fake-gateway test that rejects any key other than the key seeded for the same private session and confirms `/v1/messages` succeeds without contacting a model provider.
+- [ ] Assert `ensureShim`, shared adapters/stores, global CCR lifecycle, and `ccr code` are never called by `code`.
+- [ ] Observe red, replace the orchestration path, then run router/CLI/default-service tests green.
+
+### Deliverable 5: Remove unsafe public behavior and verify
+
+**Files:** Modify CLI/help/README and isolation tests; remove legacy modules after no production import remains.
+
+- [ ] Expose only `code` and read-only `doctor`; reject shared lifecycle/configuration commands and `--set-default`.
+- [ ] Remove production imports and code for shared CCR DB mutation, persistent shim reuse, and shared lifecycle management.
+- [ ] Run `npm test`, `npm run build`, `git diff --check`, and static scans for Codex state, `ccr code`, fallback gateway keys, and shared CCR writes.
+- [ ] Verify the global npm junction resolves to this checkout and therefore executes the built `dist`.
+- [ ] Do not run a real Claude/Cannbot prompt; live model traffic needs separate authorization.
+
+### Revised completion statement
+
+Runtime compatibility is achieved only when exact CCR `3.0.13`, private token-bound lifecycle, correct per-session gateway authentication, native-Claude isolation, and the full automated suite are proven. Parsing `3.0.0` through `3.0.12` is diagnostic coverage, not runtime compatibility.

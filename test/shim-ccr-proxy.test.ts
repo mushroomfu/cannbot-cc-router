@@ -204,3 +204,18 @@ test("sanitizes a failed CCR connection", async (t) => {
   assert.equal(result.status, 502);
   assert.equal(result.body, '{"error":"upstream_failure"}');
 });
+
+test("rejects a missing CCR gateway key before listening", () => {
+  assert.throws(() => createShim({
+    localSecret: "local-secret",
+    models: ["glm-5.2"],
+    ccrUrl: "http://127.0.0.1:3457",
+    upstreamUrl: "http://127.0.0.1:1/v1/chat/completions",
+    proxyMode: "direct",
+    readCredentials: async () => ({
+      accessToken: "access",
+      virtualKey: "virtual"
+    }),
+    refreshCredentials: async () => undefined
+  } as unknown as Parameters<typeof createShim>[0]), /CCR gateway API key is required/i);
+});

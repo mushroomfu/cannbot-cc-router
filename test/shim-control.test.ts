@@ -55,6 +55,7 @@ test("reports health and requires both secret and instance marker to stop", asyn
     localSecret: "local-secret",
     models: ["glm-5.2"],
     ccrUrl: "http://127.0.0.1:3456",
+    ccrApiKey: "ccr-test-key",
     upstreamUrl: "http://127.0.0.1:1/v1/chat/completions",
     proxyMode: "direct",
     readCredentials: async () => ({ accessToken: "access", virtualKey: "key" }),
@@ -103,6 +104,7 @@ test("rejects a request body larger than the configured limit", async (t) => {
   const shim = createShim({
     localSecret: "local-secret",
     models: ["glm-5.2"],
+    ccrApiKey: "ccr-test-key",
     ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",

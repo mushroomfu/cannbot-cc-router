@@ -55,6 +55,7 @@ test("does not disclose model IDs without the local token", async (t) => {
     localSecret: "local-secret",
     models: ["glm-5.2"],
     ccrUrl: "http://127.0.0.1:3456",
+    ccrApiKey: "ccr-test-key",
     upstreamUrl: "http://127.0.0.1:1/v1/chat/completions",
     proxyMode: "direct",
     readCredentials: async () => ({ accessToken: "access", virtualKey: "virtual" }),

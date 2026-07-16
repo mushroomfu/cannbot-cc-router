@@ -62,6 +62,7 @@ test("refreshes once and retries with newly read credentials", async (t) => {
     localSecret: "local-secret",
     models: ["glm-5.2"],
     ccrUrl: "http://127.0.0.1:3456",
+    ccrApiKey: "ccr-test-key",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
     readCredentials: async () => ({
@@ -108,6 +109,7 @@ test("shares one refresh across concurrent authentication failures", async (t) =
   const shim = createShim({
     localSecret: "local-secret",
     models: ["glm-5.2"],
+    ccrApiKey: "ccr-test-key",
     ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
@@ -149,6 +151,7 @@ test("does not retry a second authentication failure", async (t) => {
 
   const shim = createShim({
     localSecret: "local-secret",
+    ccrApiKey: "ccr-test-key",
     models: ["glm-5.2"],
     ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
@@ -175,6 +178,7 @@ test("streams SSE chunks before the upstream response ends", async (t) => {
   t.after(() => close(upstream));
 
   const shim = createShim({
+    ccrApiKey: "ccr-test-key",
     localSecret: "local-secret",
     models: ["glm-5.2"],
     ccrUrl: "http://127.0.0.1:3456",

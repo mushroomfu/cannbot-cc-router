@@ -306,3 +306,16 @@ This section supersedes every earlier statement that treats CCR `3.0.3` through 
 - The private config writes exactly one loopback Cannbot provider, keeps the gateway credential only in the private API-key database, and uses a distinct CCR-to-shim credential in the provider. It explicitly disables profiles, the Codex profile/rule, proxy/system-proxy/browser capture, bot integration, login auto-start, observability, and tool hub.
 - Port ownership is not inferred from an existing listener: gateway, core, and shim ports must be distinct. The private gateway credential must differ from the shim credential. Both checks occur before filesystem writes.
 - Current evidence is unit-level only: private environment/version/store contracts pass locally. It is not a claim that any CCR artifact has passed a private-start or model-traffic test. Real artifact matrix and real-model smoke authorization remain separate gates.
+
+## 15. Approved dual-entry contract and current compatibility target (2026-07-16)
+
+This section is authoritative over conflicting earlier scope or approval wording.
+
+1. The user approved strict dual-entry isolation on 2026-07-16. Implementation is authorized on the current branch `codex/claude-cannbot-auth-fix`; do not create or switch worktrees.
+2. Direct terminal `claude` is outside this product and remains behaviorally independent: it keeps the original Claude home, settings, environment, API endpoint, and credential path.
+3. Only explicit `cannbot-cc code` creates a private session and launches the real `claude` executable. It gives that child a private home/config/data directory and an allowlisted environment so `/model` persistence cannot reach native Claude state.
+4. The supported automatic runtime target is exactly the current verified latest CCR `3.0.13`. Versions `3.0.0` through `3.0.12` may be recognized for diagnostics but must fail before private database creation or control commands. Future versions require a new audit.
+5. Every `cannbot-cc code` invocation owns a fresh current-process shim, private CCR root, loopback ports, and two distinct secrets: Claude-to-shim and shim-to-CCR. A process from an earlier invocation is never reused.
+6. `ShimOptions.ccrApiKey` is mandatory. Missing or empty gateway authentication fails before listening or forwarding; the literal fallback `test` is forbidden.
+7. The private gateway key inserted into the session API-key database is exactly the key passed in memory to the shim. Tests exercise `/v1/messages` through a fake key-validating CCR endpoint.
+8. No real model request is authorized. Completion evidence is limited to loopback fakes, process/environment traces, source scans, build output, and local `3.0.13` lifecycle checks without a model prompt.

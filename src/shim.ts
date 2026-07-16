@@ -16,7 +16,7 @@ export interface ShimOptions {
   localSecret: string;
   models: readonly string[];
   ccrUrl: string;
-  ccrApiKey?: string;
+  ccrApiKey: string;
   upstreamUrl: string;
   proxyMode: string;
   env?: NodeJS.ProcessEnv;
@@ -136,11 +136,11 @@ function upstreamHeaders(
 
 function ccrHeaders(
   incoming: IncomingHttpHeaders,
-  apiKey: string | undefined,
+  apiKey: string,
   body: Buffer
 ): Record<string, string | string[]> {
   const headers = copiedHeaders(incoming);
-  headers["x-api-key"] = apiKey ?? "test";
+  headers["x-api-key"] = apiKey;
   headers["content-length"] = String(body.byteLength);
   return headers;
 }
@@ -246,6 +246,9 @@ function unauthorized(response: ServerResponse): void {
 
 export function createShim(options: ShimOptions): Shim {
   const host = options.host ?? "127.0.0.1";
+  if (typeof options.ccrApiKey !== "string" || options.ccrApiKey.trim().length === 0) {
+    throw new TypeError("CCR gateway API key is required");
+  }
   const port = options.port ?? 0;
   const maximumBodyBytes = options.maxBodyBytes ?? 10 * 1024 * 1024;
   const instanceId = randomUUID();

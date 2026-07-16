@@ -78,12 +78,16 @@ export async function loadShimOptions(
   const config = validateConfig(await readJsonFile(configPath));
   const ccr = dependencies.ccr ?? await resolveCcrAdapter(paths);
   const connection = await ccr.loadConnection();
+  if (typeof connection.apiKey !== "string" || connection.apiKey.trim().length === 0) {
+    throw new Error("CCR gateway API key is missing");
+  }
+
 
   return {
     localSecret: config.localSecret,
     models: config.models,
     ccrUrl: connection.baseUrl,
-    ...(connection.apiKey ? { ccrApiKey: connection.apiKey } : {}),
+    ccrApiKey: connection.apiKey,
     upstreamUrl: CANNBOT_UPSTREAM,
     proxyMode: config.proxy,
     host: "127.0.0.1",
