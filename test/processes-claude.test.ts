@@ -203,7 +203,7 @@ test("isolates Cannbot Claude state and API environment from native Claude", asy
   assert.equal(spawnedEnv?.CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY, "1");
   assert.equal(spawnedEnv?.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC, "");
   assert.equal(spawnedEnv?.ANTHROPIC_API_KEY, undefined);
-  assert.equal(spawnedEnv?.ANTHROPIC_AUTH_TOKEN, undefined);
+  assert.equal(spawnedEnv?.ANTHROPIC_AUTH_TOKEN, "local-secret");
   assert.equal(spawnedEnv?.CODEX_HOME, undefined);
   assert.equal(spawnedEnv?.UNRELATED_SECRET, undefined);
   assert.equal(spawnedEnv?.PATH, parentEnv.PATH);

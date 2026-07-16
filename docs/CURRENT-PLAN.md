@@ -63,13 +63,15 @@ Direct claude is not wrapped and follows none of this path.
 
 - Current verified local Claude Code version: 2.1.211.
 - Claude 2.1.211 evaluates gateway model discovery from startup process.env before --settings env is applied. Supplying the discovery values only in the temporary settings file leaves /model limited to built-in Claude models and produces no gateway-models.json cache.
-- cannbot-cc code must therefore provide ANTHROPIC_BASE_URL, CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1, and CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC to the private Claude child at spawn time as well as in its private settings.
-- These values are session-local and non-secret. The Cannbot shim secret remains available only through the private apiKeyHelper; native ANTHROPIC_API_KEY and ANTHROPIC_AUTH_TOKEN values remain stripped. Direct claude is unchanged.
+- Its discovery function also reads authentication synchronously before apiKeyHelper has populated its asynchronous cache. With only apiKeyHelper configured, discovery exits without making /v1/models and is not retried during startup.
+- cannbot-cc code must therefore provide ANTHROPIC_BASE_URL, CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1, an empty CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC, and the random session shim secret as ANTHROPIC_AUTH_TOKEN directly to the private Claude child at spawn time.
+- The injected token is not the user's native token, exists only in the owned child environment, and is stripped by the shim before upstream forwarding. apiKeyHelper remains as a private fallback. Direct claude is unchanged.
 
 ## Verification status
 
-- The gateway discovery regression test was observed failing before the implementation change and passing afterward.
-- Full npm test and build pass: 78 tests, 0 failures on 2026-07-16.
+- A live fresh session proved that startup discovery flags alone were insufficient: /model still showed only built-ins and no gateway-models.json was created.
+- The synchronous discovery-token regression assertion was then observed failing with undefined and passing with the private session secret after the minimal implementation change.
+- Full npm test and build pass after the token change: 78 tests, 0 failures on 2026-07-16.
 - git diff --check passes, and the focused production isolation scan has no matches.
 - No real model request was sent during verification.
 

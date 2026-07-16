@@ -51,7 +51,8 @@ function privateClaudeChildEnv(
   parentEnv: NodeJS.ProcessEnv,
   directory: string,
   noProxy: string,
-  gatewayUrl: string
+  gatewayUrl: string,
+  gatewayAuthToken: string
 ): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
   for (const [name, value] of Object.entries(parentEnv)) {
@@ -65,6 +66,7 @@ function privateClaudeChildEnv(
     ...env,
     APPDATA: appData,
     ANTHROPIC_BASE_URL: gatewayUrl,
+    ANTHROPIC_AUTH_TOKEN: gatewayAuthToken,
     CLAUDE_CONFIG_DIR: join(directory, "claude"),
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "",
     CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY: "1",
@@ -153,7 +155,7 @@ export async function runClaudeCode(
       "claude",
       [...claudeArgs, "--settings", settingsPath],
       options,
-      privateClaudeChildEnv(parentEnv, directory, noProxy, gatewayUrl)
+      privateClaudeChildEnv(parentEnv, directory, noProxy, gatewayUrl, config.localSecret)
     );
   } finally {
     await rm(directory, { recursive: true, force: true });
