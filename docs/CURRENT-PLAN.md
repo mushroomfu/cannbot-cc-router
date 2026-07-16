@@ -59,19 +59,28 @@ Direct claude is not wrapped and follows none of this path.
 - Automated suite passes when the environment permits the test helper child process; 30 compiled test files passed individually on 2026-07-16.
 - No real model request has been sent.
 
-## Remaining verification before completion
+## Claude Code model discovery compatibility
 
-1. Start the real bundled CCR 3.0.6 artifact against a fake local shim, confirm gateway readiness, then dispose it. This is a no-model loopback test.
-2. Run npm test, npm run build, git diff --check, package dry-run, and isolation scans.
-3. Review the complete diff for secret leakage, shared-state paths, Codex references, unowned process control, and accidental changes.
-4. Commit the verified implementation on the current branch.
-5. Ask separately before any real cannbot-cc code prompt/model smoke test.
+- Current verified local Claude Code version: 2.1.211.
+- Claude 2.1.211 evaluates gateway model discovery from startup process.env before --settings env is applied. Supplying the discovery values only in the temporary settings file leaves /model limited to built-in Claude models and produces no gateway-models.json cache.
+- cannbot-cc code must therefore provide ANTHROPIC_BASE_URL, CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1, and CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC to the private Claude child at spawn time as well as in its private settings.
+- These values are session-local and non-secret. The Cannbot shim secret remains available only through the private apiKeyHelper; native ANTHROPIC_API_KEY and ANTHROPIC_AUTH_TOKEN values remain stripped. Direct claude is unchanged.
+
+## Verification status
+
+- The gateway discovery regression test was observed failing before the implementation change and passing afterward.
+- Full npm test and build pass: 78 tests, 0 failures on 2026-07-16.
+- git diff --check passes, and the focused production isolation scan has no matches.
+- No real model request was sent during verification.
+
+Remaining live check: start a fresh cannbot-cc code session and confirm /model lists Cannbot gateway models. Do not send a model prompt unless separately authorized.
 
 ## Completion criteria
 
 - The 401 regression is covered by the same explicit gateway key being seeded into private CCR and sent by the shim.
 - cannbot-cc code owns and disposes its complete private chain.
 - Direct claude retains the user's original configuration and API path.
+- Claude Code 2.1.211 starts gateway discovery and can populate /model from the authenticated private shim catalog.
 - No production path accesses Codex or shared CCR state.
 - Build, tests, static isolation checks, and no-model real artifact startup all pass.
 - Live model traffic remains unclaimed until explicitly authorized and observed.

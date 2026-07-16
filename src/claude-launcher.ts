@@ -50,7 +50,8 @@ const CLAUDE_CHILD_PASSTHROUGH = new Set([
 function privateClaudeChildEnv(
   parentEnv: NodeJS.ProcessEnv,
   directory: string,
-  noProxy: string
+  noProxy: string,
+  gatewayUrl: string
 ): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
   for (const [name, value] of Object.entries(parentEnv)) {
@@ -63,7 +64,10 @@ function privateClaudeChildEnv(
   return {
     ...env,
     APPDATA: appData,
+    ANTHROPIC_BASE_URL: gatewayUrl,
     CLAUDE_CONFIG_DIR: join(directory, "claude"),
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "",
+    CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY: "1",
     HOME: directory,
     LOCALAPPDATA: appData,
     NODE_NO_WARNINGS: "1",
@@ -114,10 +118,11 @@ export async function runClaudeCode(
   const noProxy = mergeNoProxy([parentEnv.NO_PROXY, parentEnv.no_proxy].filter(Boolean).join(","));
   const oneMillionContext = options.contextWindow === "1m";
   const contextModel = `anthropic/cannbot/${config.model}[1m]`;
+  const gatewayUrl = `http://127.0.0.1:${config.shimPort}`;
   const settings = {
     apiKeyHelper: apiKeyHelperCommand(process.execPath, helperPath),
     env: {
-      ANTHROPIC_BASE_URL: `http://127.0.0.1:${config.shimPort}`,
+      ANTHROPIC_BASE_URL: gatewayUrl,
       CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY: "1",
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "",
       NO_PROXY: noProxy,
@@ -148,7 +153,7 @@ export async function runClaudeCode(
       "claude",
       [...claudeArgs, "--settings", settingsPath],
       options,
-      privateClaudeChildEnv(parentEnv, directory, noProxy)
+      privateClaudeChildEnv(parentEnv, directory, noProxy, gatewayUrl)
     );
   } finally {
     await rm(directory, { recursive: true, force: true });

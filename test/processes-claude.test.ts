@@ -199,7 +199,9 @@ test("isolates Cannbot Claude state and API environment from native Claude", asy
   assert.equal(spawnedEnv?.XDG_CONFIG_HOME, join(sessionRoot, "xdg-config"));
   assert.equal(spawnedEnv?.XDG_DATA_HOME, join(sessionRoot, "xdg-data"));
   assert.equal(spawnedEnv?.CLAUDE_CONFIG_DIR, join(sessionRoot, "claude"));
-  assert.equal(spawnedEnv?.ANTHROPIC_BASE_URL, undefined);
+  assert.equal(spawnedEnv?.ANTHROPIC_BASE_URL, "http://127.0.0.1:8787");
+  assert.equal(spawnedEnv?.CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY, "1");
+  assert.equal(spawnedEnv?.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC, "");
   assert.equal(spawnedEnv?.ANTHROPIC_API_KEY, undefined);
   assert.equal(spawnedEnv?.ANTHROPIC_AUTH_TOKEN, undefined);
   assert.equal(spawnedEnv?.CODEX_HOME, undefined);
