@@ -7,12 +7,6 @@ export interface ResolvedPaths {
   home: string;
   projectDir: string;
   projectConfig: string;
-  shimState: string;
-  ccrConfig: string;
-  ccrV2Config: string;
-  ccrV3ConfigDb: string;
-  ccrV3GatewayConfig: string;
-  ccrV3ApiKeysDb: string;
   openCodeAuthCandidates: string[];
 }
 
@@ -25,6 +19,4 @@ export interface ProjectConfig {
   shimPort: number;
   localSecret: string;
   proxy: ProxyMode;
-  managedRoutes?: boolean;
-  ccrBackup?: string;
 }

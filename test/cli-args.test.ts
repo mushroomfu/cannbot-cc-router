@@ -7,12 +7,6 @@ test("code command preserves unknown Claude options and argument boundaries", as
   let received: string[] = [];
   const zero = async () => 0;
   const handlers: CommandHandlers = {
-    init: zero,
-    sync: zero,
-    start: zero,
-    restart: zero,
-    stop: zero,
-    status: zero,
     doctor: zero,
     code: async (args) => { received = args; return 0; }
   };
@@ -31,12 +25,6 @@ test("code command consumes its context option before forwarding Claude argument
   let receivedOptions: unknown;
   const zero = async () => 0;
   const handlers: CommandHandlers = {
-    init: zero,
-    sync: zero,
-    start: zero,
-    restart: zero,
-    stop: zero,
-    status: zero,
     doctor: zero,
     code: async (args, options) => {
       receivedArgs = args;

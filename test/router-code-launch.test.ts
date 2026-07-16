@@ -12,38 +12,32 @@ const config: ProjectConfig = {
   localSecret: "local",
   proxy: "auto"
 };
-
-test("code starts services then launches Claude directly with refreshed config", async () => {
+test("code uses only the private Claude session path", async () => {
   const trace: string[] = [];
+  const forbidden = async (): Promise<never> => {
+    trace.push("legacy-path");
+    throw new Error("legacy shared CCR path must not run");
+  };
   const service = new RouterService({
-    initialize: async () => config,
-    loadConfig: async () => { trace.push("load"); return config; },
-    validateCredentials: async () => { trace.push("credentials"); },
-    reconcile: async () => { trace.push("reconcile"); },
-    prepareCcrForReconcile: async () => { trace.push("prepare"); },
-    ensureShim: async () => { trace.push("shim"); },
-    startCcr: async () => { trace.push("ccr"); },
-    stopShim: async () => true,
-    stopCcr: async () => true,
-    restartCcr: async () => true,
-    shimStatus: async () => true,
-    ccrStatus: async () => true,
-    runCcrCode: async () => { trace.push("old-ccr-code"); return 9; },
-    runClaudeCode: async (args: readonly string[], received: ProjectConfig) => {
-      trace.push(`claude:${args.join("|")}:${received.model}`);
+    initialize: forbidden,
+    loadConfig: forbidden,
+    validateCredentials: forbidden,
+    reconcile: forbidden,
+    prepareCcrForReconcile: forbidden,
+    ensureShim: forbidden,
+    startCcr: forbidden,
+    stopShim: forbidden,
+    stopCcr: forbidden,
+    restartCcr: forbidden,
+    shimStatus: forbidden,
+    ccrStatus: forbidden,
+    runClaudeCode: forbidden,
+    runPrivateClaudeCode: async (args: readonly string[], options: { contextWindow?: string }) => {
+      trace.push(`private:${args.join("|")}:${options.contextWindow}`);
       return 4;
     }
   } as never);
 
-  assert.equal(await service.code(["-p", "hello"]), 4);
-  assert.deepEqual(trace, [
-    "prepare",
-    "load",
-    "credentials",
-    "reconcile",
-    "shim",
-    "ccr",
-    "load",
-    "claude:-p|hello:glm-5.2"
-  ]);
+  assert.equal(await service.code(["-p", "hello"], { contextWindow: "1m" }), 4);
+  assert.deepEqual(trace, ["private:-p|hello:1m"]);
 });

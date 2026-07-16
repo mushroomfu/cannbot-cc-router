@@ -2,6 +2,8 @@ import { chmod, mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+
+import { mergeNoProxy } from "./proxy.js";
 export interface PrivateCcrPaths {
   readonly appData: string;
   readonly home: string;
@@ -122,10 +124,15 @@ export async function createPrivateCcrEnvironment(
     throw error;
   }
 
+  const parentEnv = options.parentEnv ?? process.env;
+  const noProxy = mergeNoProxy([parentEnv.NO_PROXY, parentEnv.no_proxy].filter(Boolean).join(","));
+
   const env: NodeJS.ProcessEnv = {
-    ...inheritedEnvironment(options.parentEnv ?? process.env),
+    ...inheritedEnvironment(parentEnv),
     APPDATA: paths.appData,
     CCR_INTERNAL_APP_DATA_DIR: paths.appData,
+    NO_PROXY: noProxy,
+    no_proxy: noProxy,
     CCR_INTERNAL_HOME_DIR: paths.home,
     CCR_INTERNAL_USER_DATA_DIR: paths.userData,
     HOME: paths.home,

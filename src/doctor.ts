@@ -1,6 +1,6 @@
 import type { DetectedCcrVersion } from "./ccr-version.js";
 
-export type DiagnosticStatus = "pass" | "warn" | "fail";
+export type DiagnosticStatus = "pass" | "fail";
 
 export interface DiagnosticCheck {
   name: string;
@@ -16,14 +16,12 @@ export interface DoctorReport {
 
 export interface DoctorDependencies {
   nodeVersion(): string;
-  executable(name: "cannbot" | "ccr" | "claude"): Promise<boolean>;
+  executable(name: "cannbot" | "claude"): Promise<boolean>;
   ccrVersion(): Promise<DetectedCcrVersion>;
   credentials(): Promise<void>;
-  ccrConfig(): Promise<void>;
+  projectConfig(): Promise<void>;
   proxy(): Promise<string>;
   upstream(): Promise<boolean>;
-  shim(): Promise<boolean>;
-  ccr(): Promise<boolean>;
 }
 
 async function checked(
@@ -41,15 +39,16 @@ async function checked(
 }
 
 export async function runDoctor(dependencies: DoctorDependencies): Promise<DoctorReport> {
-  const major = Number.parseInt(dependencies.nodeVersion().split(".")[0] ?? "0", 10);
+  const version = dependencies.nodeVersion();
+  const major = Number.parseInt(version.split(".")[0] ?? "0", 10);
   const checks: DiagnosticCheck[] = [{
     name: "node",
-    status: major >= 20 ? "pass" : "fail",
-    detail: `Node.js ${dependencies.nodeVersion()}`,
-    ...(major >= 20 ? {} : { action: "Install Node.js 20 or newer" })
+    status: major >= 22 ? "pass" : "fail",
+    detail: `Node.js ${version}`,
+    ...(major >= 22 ? {} : { action: "Install Node.js 22 or newer" })
   }];
 
-  for (const name of ["cannbot", "ccr", "claude"] as const) {
+  for (const name of ["cannbot", "claude"] as const) {
     const available = await dependencies.executable(name);
     checks.push({
       name,
@@ -60,14 +59,15 @@ export async function runDoctor(dependencies: DoctorDependencies): Promise<Docto
   }
 
   try {
-    const version = await dependencies.ccrVersion();
-    checks.push({ name: "ccr-version", status: "pass", detail: `CCR ${version.version} is supported` });
+    const ccr = await dependencies.ccrVersion();
+    if (ccr.version !== "3.0.6") throw new Error("unsupported bundled CCR");
+    checks.push({ name: "ccr-version", status: "pass", detail: "Bundled CCR CLI 3.0.6" });
   } catch {
     checks.push({
       name: "ccr-version",
       status: "fail",
-      detail: "CCR version is unsupported or unavailable",
-      action: "Install a supported CCR v2 or v3 release"
+      detail: "Bundled CCR CLI is unavailable or not 3.0.6",
+      action: "Run npm install in cannbot-cc-router"
     });
   }
 
@@ -78,10 +78,10 @@ export async function runDoctor(dependencies: DoctorDependencies): Promise<Docto
     "Run `cannbot connect`"
   ));
   checks.push(await checked(
-    "ccr-config",
-    dependencies.ccrConfig,
-    "CCR configuration is valid",
-    "Run `cannbot-cc init`"
+    "project-config",
+    dependencies.projectConfig,
+    "Project configuration is readable",
+    "Run `cannbot-cc code` to create project configuration"
   ));
 
   try {
@@ -96,7 +96,7 @@ export async function runDoctor(dependencies: DoctorDependencies): Promise<Docto
       name: "proxy",
       status: "fail",
       detail: "proxy configuration is invalid",
-      action: "Check HTTPS_PROXY, ALL_PROXY, or use --proxy direct"
+      action: "Check standard proxy environment variables or project proxy mode"
     });
   }
 
@@ -105,23 +105,8 @@ export async function runDoctor(dependencies: DoctorDependencies): Promise<Docto
     name: "cannbot-upstream",
     status: upstream ? "pass" : "fail",
     detail: upstream ? "Cannbot model list is reachable" : "Cannbot model list is unreachable",
-    ...(upstream ? {} : { action: "Check Shadowsocks and Cannbot login" })
+    ...(upstream ? {} : { action: "Check proxy settings and Cannbot login" })
   });
 
-  for (const [name, active] of [
-    ["shim", await dependencies.shim()],
-    ["ccr-service", await dependencies.ccr()]
-  ] as const) {
-    checks.push({
-      name,
-      status: active ? "pass" : "warn",
-      detail: active ? `${name} is running` : `${name} is stopped`,
-      ...(active ? {} : { action: "Run `cannbot-cc start`" })
-    });
-  }
-
-  return {
-    ok: !checks.some((check) => check.status === "fail"),
-    checks
-  };
+  return { ok: !checks.some((check) => check.status === "fail"), checks };
 }

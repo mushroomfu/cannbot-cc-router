@@ -32,6 +32,9 @@ test("private CCR environment is child-only, fully contained, and disposable", a
     LOCALAPPDATA: "shared-local-app-data",
     PATH: process.env.PATH ?? "path",
     SOME_UNRELATED_SECRET: "must-not-leak",
+    HTTPS_PROXY: "http://proxy.example:8080",
+    NO_PROXY: "internal.example",
+    no_proxy: "lower.example",
     TEMP: "shared-temp",
     TMP: "shared-tmp",
     TMPDIR: "shared-tmpdir",
@@ -49,6 +52,10 @@ test("private CCR environment is child-only, fully contained, and disposable", a
     assert.equal(session.env.USERPROFILE, session.paths.home);
     assert.equal(session.env.APPDATA, session.paths.appData);
     assert.equal(session.env.LOCALAPPDATA, session.paths.appData);
+    assert.equal(session.env.HTTPS_PROXY, parentEnv.HTTPS_PROXY);
+    assert.equal(session.env.NO_PROXY, "internal.example,lower.example,localhost,127.0.0.1");
+    assert.equal(session.env.no_proxy, session.env.NO_PROXY);
+    assert.match(session.env.NO_PROXY ?? "", /127.0.0.1/);
     assert.equal(session.env.TEMP, session.paths.temp);
     assert.equal(session.env.TMP, session.paths.temp);
     assert.equal(session.env.TMPDIR, session.paths.temp);

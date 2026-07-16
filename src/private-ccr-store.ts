@@ -43,10 +43,10 @@ interface ColumnInfo {
 }
 
 function supportedPrivatePatch(version: DetectedCcrVersion): number {
-  if (version.major !== 3 || version.version !== "3.0.13") {
-    throw new Error("Private CCR lifecycle requires CCR 3.0.13");
+  if (version.major !== 3 || version.version !== "3.0.6") {
+    throw new Error("Private CCR lifecycle requires CCR 3.0.6");
   }
-  return 13;
+  return 6;
 }
 
 function assertInside(root: string, candidate: string): void {
@@ -136,9 +136,10 @@ function privateConfig(
     API_TIMEOUT_MS: 600000,
     CUSTOM_ROUTER_PATH: "",
     HOST: "127.0.0.1",
-    PORT: options.gatewayPort,
+    PORT: options.corePort,
     Providers: [{
       name: "cannbot",
+      id: "cannbot",
       api_base_url: `http://127.0.0.1:${options.shimPort}/v1/chat/completions`,
       api_key: localSecret,
       models: [...models],

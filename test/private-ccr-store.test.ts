@@ -96,11 +96,11 @@ function seedOptions(
   };
 }
 
-test("seeds a fully private CCR 3.0.13 layout for only the Cannbot provider", async () => {
+test("seeds a fully private CCR 3.0.6 layout for only the Cannbot provider", async () => {
   const session = await createPrivateCcrEnvironment({ parentEnv: { PATH: "private-path" } });
   try {
     const { seedPrivateCcrStore } = await loadPrivateCcrStore();
-    const layout = await seedPrivateCcrStore(seedOptions(session.paths, "3.0.13"));
+    const layout = await seedPrivateCcrStore(seedOptions(session.paths, "3.0.6"));
 
     assert.equal(layout.configDir, join(session.paths.appData, "claude-code-router"));
     assert.equal(layout.configDb, join(layout.configDir, "config.sqlite"));
@@ -115,10 +115,11 @@ test("seeds a fully private CCR 3.0.13 layout for only the Cannbot provider", as
 
     const config = readConfig(layout);
     assert.equal(config.HOST, "127.0.0.1");
-    assert.equal(config.PORT, 43101);
+    assert.equal(config.PORT, 43102);
     assert.equal(config.routerEndpoint, "http://127.0.0.1:43101");
     assert.deepEqual(config.Providers, [{
       name: "cannbot",
+      id: "cannbot",
       api_base_url: "http://127.0.0.1:43103/v1/chat/completions",
       api_key: "shim-test-secret",
       models: ["glm-test"],
@@ -231,20 +232,20 @@ test("seeds a fully private CCR 3.0.13 layout for only the Cannbot provider", as
   }
 });
 
-test("allows only CCR 3.0.13 to seed a private lifecycle store", async () => {
+test("allows only the npm latest CCR CLI 3.0.6 to seed a private lifecycle store", async () => {
   const session = await createPrivateCcrEnvironment({ parentEnv: { PATH: "private-path" } });
   try {
     const { seedPrivateCcrStore } = await loadPrivateCcrStore();
-    for (const patch of [...Array(13).keys(), 14]) {
+    for (const patch of [...Array(15).keys()].filter((value) => value !== 6)) {
       await assert.rejects(
         () => seedPrivateCcrStore(seedOptions(session.paths, `3.0.${patch}`)),
-        /private CCR lifecycle requires CCR 3\.0\.13/i
+        /private CCR lifecycle requires CCR 3\.0\.6/i
       );
     }
     assert.equal(await exists(join(session.paths.appData, "Claude Code Router", "config.sqlite")), false);
     assert.equal(await exists(join(session.paths.appData, "claude-code-router", "config.sqlite")), false);
 
-    const layout = await seedPrivateCcrStore(seedOptions(session.paths, "3.0.13"));
+    const layout = await seedPrivateCcrStore(seedOptions(session.paths, "3.0.6"));
     assert.equal(layout.configDir, join(session.paths.appData, "claude-code-router"));
     assert.equal(await exists(layout.configDb), true);
     assert.equal(await exists(layout.apiKeysDb), true);
@@ -257,7 +258,7 @@ test("rejects private layout requests that reuse a loopback port", async () => {
   const session = await createPrivateCcrEnvironment({ parentEnv: { PATH: "private-path" } });
   try {
     const { seedPrivateCcrStore } = await loadPrivateCcrStore();
-    const options = { ...seedOptions(session.paths, "3.0.13"), corePort: 43101 };
+    const options = { ...seedOptions(session.paths, "3.0.6"), corePort: 43101 };
     await assert.rejects(
       () => seedPrivateCcrStore(options),
       /ports.*distinct/i
@@ -272,7 +273,7 @@ test("rejects a gateway credential that equals the shim credential", async () =>
   const session = await createPrivateCcrEnvironment({ parentEnv: { PATH: "private-path" } });
   try {
     const { seedPrivateCcrStore } = await loadPrivateCcrStore();
-    const options = { ...seedOptions(session.paths, "3.0.13"), gatewayApiKey: "shim-test-secret" };
+    const options = { ...seedOptions(session.paths, "3.0.6"), gatewayApiKey: "shim-test-secret" };
     await assert.rejects(
       () => seedPrivateCcrStore(options),
       /gatewayApiKey.*differ/i

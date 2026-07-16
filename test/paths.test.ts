@@ -4,46 +4,36 @@ import test from "node:test";
 
 import { resolvePaths } from "../src/paths.js";
 
-test("resolves the CCR v3 Windows database layout", () => {
+test("resolves only project-owned and Cannbot credential paths", () => {
+  const home = "C:\\Users\\u";
   const paths = resolvePaths({
-    home: "C:\\Users\\u",
+    home,
     platform: "win32",
     env: { APPDATA: "D:\\AppData" }
   });
-  assert.equal(paths.ccrV3ConfigDb, join("D:\\AppData", "claude-code-router", "config.sqlite"));
-  assert.equal(paths.ccrV3ApiKeysDb, join("D:\\AppData", "claude-code-router", "api-keys.sqlite"));
-  assert.equal(
-    (paths as unknown as Record<string, string>).ccrV3GatewayConfig,
-    join("D:\\AppData", "claude-code-router", "gateway.config.json")
-  );
+
+  assert.deepEqual(Object.keys(paths).sort(), [
+    "home",
+    "openCodeAuthCandidates",
+    "projectConfig",
+    "projectDir"
+  ]);
+  assert.equal(paths.projectDir, join(home, ".cannbot-cc-router"));
+  assert.equal(paths.projectConfig, join(home, ".cannbot-cc-router", "config.json"));
+  assert.deepEqual(paths.openCodeAuthCandidates, [
+    join(home, ".local", "share", "opencode", "auth.json"),
+    join("D:\\AppData", "opencode", "auth.json")
+  ]);
 });
 
-test("resolves the CCR v3 Linux and macOS database layout", () => {
-  for (const [platform, home] of [["linux", "/home/u"], ["darwin", "/Users/u"]] as const) {
-    const paths = resolvePaths({ home, platform, env: {} });
-    assert.equal(paths.ccrV3ConfigDb, join(home, ".claude-code-router", "config.sqlite"));
-    assert.equal(paths.ccrV3ApiKeysDb, join(home, ".claude-code-router", "app-data", "api-keys.sqlite"));
-    assert.equal(
-      (paths as unknown as Record<string, string>).ccrV3GatewayConfig,
-      join(home, ".claude-code-router", "gateway.config.json")
-    );
-  }
-});
-
-test("honors CCR internal directory overrides", () => {
+test("honors XDG data location without resolving shared CCR state", () => {
   const paths = resolvePaths({
     home: "/home/u",
     platform: "linux",
-    env: {
-      CCR_INTERNAL_HOME_DIR: "/srv/ccr-home",
-      CCR_INTERNAL_APP_DATA_DIR: "/srv/ccr-appdata",
-      CCR_INTERNAL_USER_DATA_DIR: "/srv/ccr-userdata"
-    }
+    env: { XDG_DATA_HOME: "/srv/data" }
   });
-  assert.equal(paths.ccrV3ConfigDb, join("/srv/ccr-home", ".claude-code-router", "config.sqlite"));
-  assert.equal(paths.ccrV3ApiKeysDb, join("/srv/ccr-userdata", "api-keys.sqlite"));
-  assert.equal(
-    (paths as unknown as Record<string, string>).ccrV3GatewayConfig,
-    join("/srv/ccr-home/.claude-code-router", "gateway.config.json")
-  );
+  assert.deepEqual(paths.openCodeAuthCandidates, [
+    join("/srv/data", "opencode", "auth.json")
+  ]);
+  assert.doesNotMatch(JSON.stringify(paths), /claude-code-router|config\.sqlite|api-keys/);
 });
