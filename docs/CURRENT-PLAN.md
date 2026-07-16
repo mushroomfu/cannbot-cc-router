@@ -57,7 +57,7 @@ Direct claude is not wrapped and follows none of this path.
 - Project path resolution reduced to project-owned configuration and Cannbot credential discovery.
 - Production build passes.
 - Automated suite passes when the environment permits the test helper child process; 30 compiled test files passed individually on 2026-07-16.
-- No real model request has been sent.
+- Automated verification does not send real model requests; live prompts are user-initiated only.
 
 ## Claude Code model discovery compatibility
 
@@ -67,22 +67,32 @@ Direct claude is not wrapped and follows none of this path.
 - cannbot-cc code must therefore provide ANTHROPIC_BASE_URL, CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1, an empty CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC, and the random session shim secret as ANTHROPIC_AUTH_TOKEN directly to the private Claude child at spawn time.
 - The injected token is not the user's native token, exists only in the owned child environment, and is stripped by the shim before upstream forwarding. apiKeyHelper remains as a private fallback. Direct claude is unchanged.
 
+## Cannbot upstream authentication compatibility
+
+- Current verified local Cannbot CLI version: 1.0.1.
+- The installed Cannbot CLI provider reads the OpenCode cannbot OAuth access token and cannbot-vk API key, then sends Authorization: Bearer <accessToken> together with x-api-vkey: <virtualKey> to the compatible-mode endpoint.
+- Sending the virtual key alone as the Bearer credential is incompatible with the current provider. A live glm-5.2 request reached the private CCR provider but returned 401 after the shim retried with the same wrong header mapping.
+- The shim must strip all inbound authorization, x-api-key, and x-api-vkey values, then inject the freshly read access token and virtual key as the two distinct Cannbot credentials.
+- On a 401 or 403, credential refresh remains single-flight and the shim rereads both credentials as one pair before its only retry.
+
 ## Verification status
 
-- A live fresh session proved that startup discovery flags alone were insufficient: /model still showed only built-ins and no gateway-models.json was created.
-- The synchronous discovery-token regression assertion was then observed failing with undefined and passing with the private session secret after the minimal implementation change.
-- Full npm test and build pass after the token change: 78 tests, 0 failures on 2026-07-16.
-- git diff --check passes, and the focused production isolation scan has no matches.
-- No real model request was sent during verification.
+- A live fresh session created gateway-models.json with all five Cannbot models, confirming Claude 2.1.211 model discovery now works.
+- A user-initiated glm-5.2 prompt then reached the private CCR cannbot provider, whose usage database recorded repeated 401 responses of about 13 to 14 seconds each.
+- The installed Cannbot CLI 1.0.1 binary confirmed the expected dual-header contract; the focused regression test failed with Bearer virtual-secret instead of Bearer access-secret before the shim change and passed afterward.
+- Thirteen focused shim authentication, refresh, concurrency, and isolation tests pass.
+- Full npm test and build pass after the dual-auth change: 78 tests, 0 failures on 2026-07-16.
+- Automated verification sent no additional real model request.
 
-Remaining live check: start a fresh cannbot-cc code session and confirm /model lists Cannbot gateway models. Do not send a model prompt unless separately authorized.
+Remaining live check: exit the current session, start a fresh cannbot-cc code session using the rebuilt CLI, and retry a user-initiated prompt. Do not claim a successful model response until it is observed.
 
 ## Completion criteria
 
-- The 401 regression is covered by the same explicit gateway key being seeded into private CCR and sent by the shim.
+- The private CCR gateway 401 regression is covered by the same explicit gateway key being seeded into private CCR and sent by the shim.
+- The Cannbot upstream 401 regression is covered by matching the installed CLI's Bearer access token plus x-api-vkey contract.
 - cannbot-cc code owns and disposes its complete private chain.
 - Direct claude retains the user's original configuration and API path.
 - Claude Code 2.1.211 starts gateway discovery and can populate /model from the authenticated private shim catalog.
 - No production path accesses Codex or shared CCR state.
 - Build, tests, static isolation checks, and no-model real artifact startup all pass.
-- Live model traffic remains unclaimed until explicitly authorized and observed.
+- A successful live model response remains unclaimed until observed in a fresh user-run session.

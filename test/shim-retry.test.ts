@@ -65,10 +65,10 @@ test("refreshes once and retries with newly read credentials", async (t) => {
     ccrApiKey: "ccr-test-key",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
-    readCredentials: async () => ({
-      accessToken: `access-${credentialReads}`,
-      virtualKey: `virtual-${++credentialReads}`
-    }),
+    readCredentials: async () => {
+      credentialReads += 1;
+      return { accessToken: `access-${credentialReads}`, virtualKey: `virtual-${credentialReads}` };
+    },
     refreshCredentials: async () => {
       refreshes += 1;
     }
@@ -79,11 +79,10 @@ test("refreshes once and retries with newly read credentials", async (t) => {
   assert.deepEqual(await post(address.port), { status: 200, body: "ok" });
   assert.equal(refreshes, 1);
   assert.deepEqual(receivedHeaders.map(({ authorization }) => authorization), [
-    "Bearer virtual-1",
-    "Bearer virtual-2"
+    "Bearer access-1",
+    "Bearer access-2"
   ]);
-  assert.deepEqual(receivedHeaders.map(({ virtualKey }) => virtualKey), [undefined, undefined]);
-  assert.doesNotMatch(JSON.stringify(receivedHeaders), /access-/);
+  assert.deepEqual(receivedHeaders.map(({ virtualKey }) => virtualKey), ["virtual-1", "virtual-2"]);
 });
 
 test("shares one refresh across concurrent authentication failures", async (t) => {
@@ -113,10 +112,10 @@ test("shares one refresh across concurrent authentication failures", async (t) =
     ccrUrl: "http://127.0.0.1:3456",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
-    readCredentials: async () => ({
-      accessToken: `access-${credentialReads}`,
-      virtualKey: `virtual-${++credentialReads}`
-    }),
+    readCredentials: async () => {
+      credentialReads += 1;
+      return { accessToken: `access-${credentialReads}`, virtualKey: `virtual-${credentialReads}` };
+    },
     refreshCredentials: async () => {
       refreshes += 1;
       await new Promise((resolve) => setTimeout(resolve, 25));
@@ -130,13 +129,12 @@ test("shares one refresh across concurrent authentication failures", async (t) =
   assert.equal(refreshes, 1);
   assert.equal(requests, 4);
   assert.deepEqual([...receivedHeaders.map(({ authorization }) => authorization)].sort(), [
-    "Bearer virtual-1",
-    "Bearer virtual-2",
-    "Bearer virtual-3",
-    "Bearer virtual-4"
+    "Bearer access-1",
+    "Bearer access-2",
+    "Bearer access-3",
+    "Bearer access-4"
   ]);
-  assert.deepEqual(receivedHeaders.map(({ virtualKey }) => virtualKey), [undefined, undefined, undefined, undefined]);
-  assert.doesNotMatch(JSON.stringify(receivedHeaders), /access-/);
+  assert.deepEqual([...receivedHeaders.map(({ virtualKey }) => virtualKey)].sort(), ["virtual-1", "virtual-2", "virtual-3", "virtual-4"]);
 });
 
 test("does not retry a second authentication failure", async (t) => {

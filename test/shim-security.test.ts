@@ -59,10 +59,10 @@ test("rereads credentials for every independent request", async (t) => {
     ccrApiKey: "ccr-test-key",
     upstreamUrl: `http://127.0.0.1:${upstreamPort}/v1/chat/completions`,
     proxyMode: "direct",
-    readCredentials: async () => ({
-      accessToken: `access-${reads}`,
-      virtualKey: `virtual-${++reads}`
-    }),
+    readCredentials: async () => {
+      reads += 1;
+      return { accessToken: `access-${reads}`, virtualKey: `virtual-${reads}` };
+    },
     refreshCredentials: async () => undefined
   });
   const address = await shim.listen();
@@ -71,11 +71,10 @@ test("rereads credentials for every independent request", async (t) => {
   await post(address.port);
   await post(address.port);
   assert.deepEqual(received.map(({ authorization }) => authorization), [
-    "Bearer virtual-1",
-    "Bearer virtual-2"
+    "Bearer access-1",
+    "Bearer access-2"
   ]);
-  assert.deepEqual(received.map(({ virtualKey }) => virtualKey), [undefined, undefined]);
-  assert.doesNotMatch(JSON.stringify(received), /access-/);
+  assert.deepEqual(received.map(({ virtualKey }) => virtualKey), ["virtual-1", "virtual-2"]);
 });
 
 test("does not expose internal error details to local clients", async (t) => {

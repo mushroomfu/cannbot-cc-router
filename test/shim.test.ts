@@ -57,7 +57,7 @@ function post(port: number, authorization: string, body: string, extraHeaders: R
   });
 }
 
-test("authenticates locally and injects the Cannbot virtual key as Bearer auth", async (t) => {
+test("authenticates locally and injects Cannbot access and virtual credentials", async (t) => {
   const captured: CapturedRequest[] = [];
   const upstream = createServer((incoming, response) => {
     const chunks: Buffer[] = [];
@@ -96,10 +96,10 @@ test("authenticates locally and injects the Cannbot virtual key as Bearer auth",
   assert.deepEqual(result, { status: 200, body: '{"ok":true}' });
   assert.equal(captured.length, 1);
   assert.equal(captured[0].body, body);
-  assert.equal(captured[0].headers.authorization, "Bearer virtual-secret");
+  assert.equal(captured[0].headers.authorization, "Bearer access-secret");
   assert.equal(captured[0].headers["x-api-key"], undefined);
-  assert.equal(captured[0].headers["x-api-vkey"], undefined);
-  assert.doesNotMatch(JSON.stringify(captured[0].headers), /access-secret|attacker|local-secret/);
+  assert.equal(captured[0].headers["x-api-vkey"], "virtual-secret");
+  assert.doesNotMatch(JSON.stringify(captured[0].headers), /attacker|local-secret/);
   assert.equal(captured[0].headers.host, `127.0.0.1:${upstreamPort}`);
 });
 

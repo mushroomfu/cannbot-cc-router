@@ -63,7 +63,7 @@ function createTestShim(upstreamUrl: string) {
   });
 }
 
-test("accepts x-api-key when Authorization is overwritten and strips both local credentials", async (t) => {
+test("accepts x-api-key and replaces incoming credentials with Cannbot credentials", async (t) => {
   let headers: IncomingHttpHeaders | undefined;
   const upstream = createServer((incoming, response) => {
     headers = incoming.headers;
@@ -83,9 +83,9 @@ test("accepts x-api-key when Authorization is overwritten and strips both local 
   });
 
   assert.equal(result.status, 200);
-  assert.equal(headers?.authorization, "Bearer virtual-secret");
+  assert.equal(headers?.authorization, "Bearer access-secret");
   assert.equal(headers?.["x-api-key"], undefined);
-  assert.equal(headers?.["x-api-vkey"], undefined);
+  assert.equal(headers?.["x-api-vkey"], "virtual-secret");
 });
 
 test("accepts x-api-key without an Authorization header", async (t) => {
