@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import test from "node:test";
+import { dirname, join } from "node:path";
 import type { ChildProcess, SpawnOptions } from "node:child_process";
 
 import * as processes from "../src/processes.js";
@@ -146,4 +147,83 @@ test("does not override a model explicitly supplied to Claude", async () => {
   }), 0);
   assert.deepEqual(args.slice(0, 2), ["--model", "anthropic/cannbot/qwen3.7-max"]);
   assert.equal(args.includes("sonnet[1m]"), false);
+
+});
+test("isolates Cannbot Claude state and API environment from native Claude", async () => {
+  let spawnedEnv: NodeJS.ProcessEnv | undefined;
+  let sessionRoot = "";
+  let settingsPath = "";
+  const parentEnv: NodeJS.ProcessEnv = {
+    PATH: process.env.PATH ?? "test-path",
+    PATHEXT: process.env.PATHEXT,
+    SystemRoot: process.env.SystemRoot,
+    HOME: "C:\\native-home",
+    USERPROFILE: "C:\\native-profile",
+    APPDATA: "C:\\native-appdata",
+    LOCALAPPDATA: "C:\\native-localappdata",
+    XDG_CONFIG_HOME: "C:\\native-xdg-config",
+    XDG_DATA_HOME: "C:\\native-xdg-data",
+    CLAUDE_CONFIG_DIR: "C:\\native-claude",
+    ANTHROPIC_BASE_URL: "https://native.example",
+    ANTHROPIC_API_KEY: "native-api-key",
+    ANTHROPIC_AUTH_TOKEN: "native-auth-token",
+    CODEX_HOME: "C:\\native-codex",
+    HTTPS_PROXY: "http://proxy.example:8080",
+    NO_PROXY: "internal.example",
+    UNRELATED_SECRET: "must-not-leak"
+  };
+  const before = { ...parentEnv };
+  const spawn = ((_command, receivedArgs, receivedOptions) => {
+    spawnedEnv = receivedOptions.env;
+    const settingsIndex = receivedArgs.lastIndexOf("--settings");
+    settingsPath = receivedArgs[settingsIndex + 1];
+    sessionRoot = dirname(settingsPath);
+    const claudeConfig = spawnedEnv?.CLAUDE_CONFIG_DIR;
+    assert.equal(typeof claudeConfig, "string");
+    assert.equal(claudeConfig, join(sessionRoot, "claude"));
+    mkdirSync(claudeConfig!, { recursive: true });
+    writeFileSync(join(claudeConfig!, "model-state.json"), "private-model", "utf8");
+    const child = new EventEmitter() as ChildProcess;
+    Object.assign(child, { stdin: null, stdout: null, stderr: null, kill: () => true });
+    queueMicrotask(() => child.emit("close", 0, null));
+    return child;
+  }) as SpawnFunction;
+
+  await processes.runClaudeCode([], config, { spawn, env: parentEnv });
+
+  assert.deepEqual(parentEnv, before);
+  assert.equal(spawnedEnv?.HOME, sessionRoot);
+  assert.equal(spawnedEnv?.USERPROFILE, sessionRoot);
+  assert.equal(spawnedEnv?.APPDATA, join(sessionRoot, "app-data"));
+  assert.equal(spawnedEnv?.LOCALAPPDATA, join(sessionRoot, "app-data"));
+  assert.equal(spawnedEnv?.XDG_CONFIG_HOME, join(sessionRoot, "xdg-config"));
+  assert.equal(spawnedEnv?.XDG_DATA_HOME, join(sessionRoot, "xdg-data"));
+  assert.equal(spawnedEnv?.CLAUDE_CONFIG_DIR, join(sessionRoot, "claude"));
+  assert.equal(spawnedEnv?.ANTHROPIC_BASE_URL, undefined);
+  assert.equal(spawnedEnv?.ANTHROPIC_API_KEY, undefined);
+  assert.equal(spawnedEnv?.ANTHROPIC_AUTH_TOKEN, undefined);
+  assert.equal(spawnedEnv?.CODEX_HOME, undefined);
+  assert.equal(spawnedEnv?.UNRELATED_SECRET, undefined);
+  assert.equal(spawnedEnv?.PATH, parentEnv.PATH);
+  assert.equal(spawnedEnv?.HTTPS_PROXY, parentEnv.HTTPS_PROXY);
+  assert.match(spawnedEnv?.NO_PROXY ?? "", /internal\.example/);
+  assert.equal(existsSync(settingsPath), false);
+  assert.equal(existsSync(sessionRoot), false);
+});
+
+test("removes the private Claude root when spawning Claude fails", async () => {
+  let sessionRoot = "";
+  const spawn = ((_command, receivedArgs) => {
+    sessionRoot = dirname(receivedArgs[receivedArgs.lastIndexOf("--settings") + 1]);
+    const child = new EventEmitter() as ChildProcess;
+    Object.assign(child, { stdin: null, stdout: null, stderr: null, kill: () => true });
+    queueMicrotask(() => child.emit("error", new Error("spawn failed")));
+    return child;
+  }) as SpawnFunction;
+
+  await assert.rejects(
+    () => processes.runClaudeCode([], config, { spawn, env: { PATH: process.env.PATH } }),
+    /spawn failed/
+  );
+  assert.equal(existsSync(sessionRoot), false);
 });

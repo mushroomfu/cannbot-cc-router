@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { resolveCommandSync } from "./command-resolution.js";
-import { childProxyEnv, mergeNoProxy } from "./proxy.js";
+import { mergeNoProxy } from "./proxy.js";
 import type { ProjectConfig } from "./types.js";
 
 export type ClaudeSpawnFunction = (
@@ -33,6 +33,52 @@ export function apiKeyHelperCommand(nodePath: string, helperPath: string): strin
   return `${quote(nodePath)} ${quote(helperPath)}`;
 }
 
+const CLAUDE_CHILD_PASSTHROUGH = new Set([
+  "ALL_PROXY",
+  "COMSPEC",
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "NODE_EXTRA_CA_CERTS",
+  "PATH",
+  "PATHEXT",
+  "SSL_CERT_DIR",
+  "SSL_CERT_FILE",
+  "SYSTEMROOT",
+  "WINDIR"
+]);
+
+function privateClaudeChildEnv(
+  parentEnv: NodeJS.ProcessEnv,
+  directory: string,
+  noProxy: string
+): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const [name, value] of Object.entries(parentEnv)) {
+    if (value !== undefined && CLAUDE_CHILD_PASSTHROUGH.has(name.toUpperCase())) {
+      env[name] = value;
+    }
+  }
+  const appData = join(directory, "app-data");
+  const temp = join(directory, "temp");
+  return {
+    ...env,
+    APPDATA: appData,
+    CLAUDE_CONFIG_DIR: join(directory, "claude"),
+    HOME: directory,
+    LOCALAPPDATA: appData,
+    NODE_NO_WARNINGS: "1",
+    NO_PROXY: noProxy,
+    no_proxy: noProxy,
+    TEMP: temp,
+    TMP: temp,
+    TMPDIR: temp,
+    USERPROFILE: directory,
+    XDG_CONFIG_HOME: join(directory, "xdg-config"),
+    XDG_DATA_HOME: join(directory, "xdg-data")
+  };
+}
+
+
 function hasExplicitClaudeModel(args: readonly string[]): boolean {
   return args.some((arg) => arg === "--model" || arg === "-m" || arg.startsWith("--model="));
 }
@@ -40,7 +86,8 @@ function hasExplicitClaudeModel(args: readonly string[]): boolean {
 function runAttached(
   command: string,
   args: readonly string[],
-  options: RunClaudeOptions
+  options: RunClaudeOptions,
+  env: NodeJS.ProcessEnv
 ): Promise<number> {
   const spawn = options.spawn ?? defaultSpawn;
   return new Promise((resolve, reject) => {
@@ -48,11 +95,7 @@ function runAttached(
       shell: false,
       stdio: "inherit",
       windowsHide: false,
-      env: childProxyEnv({
-        ...process.env,
-        ...options.env,
-        NODE_NO_WARNINGS: "1"
-      })
+      env
     });
     child.once("error", reject);
     child.once("close", (code) => resolve(code ?? 1));
@@ -67,12 +110,8 @@ export async function runClaudeCode(
   const directory = await mkdtemp(join(tmpdir(), "cannbot-cc-"));
   const settingsPath = join(directory, "settings.json");
   const helperPath = join(directory, "api-key-helper.mjs");
-  const noProxy = mergeNoProxy([
-    options.env?.NO_PROXY,
-    options.env?.no_proxy,
-    process.env.NO_PROXY,
-    process.env.no_proxy
-  ].filter(Boolean).join(","));
+  const parentEnv = options.env ?? process.env;
+  const noProxy = mergeNoProxy([parentEnv.NO_PROXY, parentEnv.no_proxy].filter(Boolean).join(","));
   const oneMillionContext = options.contextWindow === "1m";
   const contextModel = `anthropic/cannbot/${config.model}[1m]`;
   const settings = {
@@ -105,7 +144,12 @@ export async function runClaudeCode(
       encoding: "utf8",
       mode: 0o600
     });
-    return await runAttached("claude", [...claudeArgs, "--settings", settingsPath], options);
+    return await runAttached(
+      "claude",
+      [...claudeArgs, "--settings", settingsPath],
+      options,
+      privateClaudeChildEnv(parentEnv, directory, noProxy)
+    );
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
